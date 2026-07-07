@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0a0a0a" />
   <title>SHADOW_EYE_MATRIX — GPS Eyes Shadow Tool</title>
+  
+  <link rel="manifest" href="manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -104,166 +108,143 @@
     </div>
   </div>
 
-   <!-- ========== LOADING SCREEN OVERLAY ========== -->
-   <div id="loading-screen" class="hidden fixed inset-0 z-[10000] flex items-center justify-center bg-neutral-950">
-     <div class="text-center">
-       <div class="mb-6">
-         <svg class="h-16 w-16 text-green-400 mx-auto animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-           <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-           <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-         </svg>
-       </div>
-       <h2 class="text-2xl font-bold text-green-400 mb-2 font-mono">LOADING...</h2>
-       <div class="w-64 h-2 bg-neutral-800 rounded-full overflow-hidden mx-auto">
-         <div id="loading-bar" class="h-full bg-gradient-to-r from-green-500 via-orange-400 to-green-500 transition-all duration-300" style="width: 0%"></div>
-       </div>
-       <p id="loading-text" class="mt-3 text-sm text-orange-400 font-mono">Initializing Tactical Systems...</p>
-     </div>
-   </div>
-
-   <!-- ========== TACTICAL DASHBOARD ========== -->
-   <div id="dashboard" class="hidden h-full flex flex-col">
-
-     <!-- Header -->
-     <header class="shrink-0 border-b border-neutral-800 bg-neutral-900/95 backdrop-blur-sm z-40">
-      <div class="flex items-center justify-between px-3 py-2 sm:px-5 sm:py-3">
-        <div class="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div class="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg border border-green-500/30 bg-green-500/10">
-            <svg class="h-4 w-4 sm:h-5 sm:w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </div>
-          <div class="min-w-0">
-            <h1 class="truncate text-sm font-bold text-green-400 sm:text-lg">SHADOW_EYE_MATRIX</h1>
-            <p class="truncate text-[10px] text-orange-400 sm:text-xs">Integrated Tactical Dashboard</p>
-          </div>
+  <!-- ========== LOADING SCREEN OVERLAY (Cyberpunk/Tactical) ========== -->
+  <div id="loading-screen" class="hidden fixed inset-0 z-[10000] flex items-center justify-center bg-neutral-950">
+    <div class="loading-cyberpunk">
+      <div class="loading-scanline"></div>
+      <div class="loading-content">
+        <div class="mb-6">
+          <svg class="h-16 w-16 text-green-400 mx-auto animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
         </div>
-        <div class="flex items-center gap-2 sm:gap-3 shrink-0">
-          <span id="header-mode" class="hidden text-[10px] text-orange-400 sm:inline font-mono">MODE: ACTIVE</span>
-          <span id="header-status" class="text-[10px] sm:text-xs text-white">Ready</span>
-          <button id="logout-btn" class="rounded-lg border border-neutral-700 px-2 py-1 text-[10px] sm:px-3 sm:py-1.5 sm:text-xs text-white hover:border-red-500/50 hover:text-red-400 transition">
-            Logout
-          </button>
+        <h2 class="text-2xl font-bold text-green-400 mb-2 font-mono loading-glow">LOADING...</h2>
+        <div class="w-64 h-2 bg-neutral-800 rounded-full overflow-hidden mx-auto loading-bar-container">
+          <div id="loading-bar" class="h-full bg-gradient-to-r from-green-500 via-orange-400 to-green-500 transition-all duration-300" style="width: 0%"></div>
         </div>
+        <p id="loading-text" class="mt-3 text-sm text-orange-400 font-mono">Initializing Tactical Systems...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== TACTICAL DASHBOARD (3-Column Layout) ========== -->
+  <div id="dashboard" class="hidden h-full flex flex-col dashboard-container">
+    <header class="shrink-0 flex items-center justify-between px-3 py-2 sm:px-5 sm:py-1.5 border-b border-neutral-800 bg-neutral-900/95 backdrop-blur-sm z-40">
+      <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+        <div class="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg border border-green-500/30 bg-green-500/10">
+          <svg class="h-4 w-4 sm:h-5 sm:w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <h1 class="truncate text-sm font-bold text-green-400 sm:text-lg">SHADOW_EYE_MATRIX</h1>
+          <p class="truncate text-[10px] text-orange-400 sm:text-xs">Integrated Tactical Dashboard</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        <span id="header-mode" class="hidden text-[10px] text-orange-400 sm:inline font-mono">MODE: ACTIVE</span>
+        <span id="header-status" class="text-[10px] sm:text-xs text-white">Ready</span>
+        <span id="header-role" class="hidden text-[10px] sm:inline font-mono text-cyan-400"></span>
+        <button id="logout-btn" class="rounded-lg border border-neutral-700 px-2 py-1 text-[10px] sm:px-3 sm:py-1.5 sm:text-xs text-white hover:border-red-500/50 hover:text-red-400 transition">
+          Logout
+        </button>
       </div>
     </header>
 
-    <!-- Workspace: Top (Panel + Map) + Bottom (Console) -->
-    <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
+    <!-- 3-Column Layout: Left Sidebar | Center Map + Command | Right Sidebar -->
+    <div class="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
 
-      <!-- Top Row -->
-      <div class="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+      <!-- LEFT SIDEBAR: Control Panel Matrix -->
+      <aside id="left-sidebar" class="w-full lg:w-64 xl:w-72 shrink-0 border-b lg:border-b-0 lg:border-r border-neutral-800 bg-neutral-900 overflow-y-auto max-h-[40vh] lg:max-h-none sidebar-drawer">
+        <div class="p-3 sm:p-4 space-y-3">
 
-        <!-- LEFT: Control Panel Matrix -->
-        <aside id="control-panel" class="w-full lg:w-72 xl:w-80 shrink-0 border-b lg:border-b-0 lg:border-r border-neutral-800 bg-neutral-900 overflow-y-auto max-h-[45vh] lg:max-h-none">
-          <div class="p-3 sm:p-4 space-y-3">
+          <!-- GPS Module -->
+          <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
+            <h2 class="text-xs font-semibold text-green-400 mb-0.5">Control Panel Matrix</h2>
+            <p class="text-[10px] text-orange-400 mb-3">Admin GPS — ระบุพิกัดเครื่องปัจจุบัน</p>
+            <button id="gps-icon-btn" title="Activate Admin GPS"
+              class="group flex w-full flex-col items-center gap-1.5 rounded-xl border border-neutral-700 bg-neutral-800/50 p-4 transition hover:border-green-500/40 hover:bg-green-500/5 active:scale-[0.97]">
+              <div class="flex h-12 w-12 items-center justify-center rounded-full border-2 border-green-500/40 bg-green-500/10 group-hover:border-green-400">
+                <svg class="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                </svg>
+              </div>
+              <span class="text-xs font-medium text-white">Admin GPS Scan</span>
+              <span class="text-[10px] text-orange-400">Hybrid Geolocation</span>
+            </button>
+          </div>
 
-            <!-- GPS Module -->
-            <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
-              <h2 class="text-xs font-semibold text-green-400 mb-0.5">Control Panel Matrix</h2>
-              <p class="text-[10px] text-orange-400 mb-3">Admin GPS — ระบุพิกัดเครื่องปัจจุบัน</p>
-              <button id="gps-icon-btn" title="Activate Admin GPS"
-                class="group flex w-full flex-col items-center gap-1.5 rounded-xl border border-neutral-700 bg-neutral-800/50 p-4 transition hover:border-green-500/40 hover:bg-green-500/5 active:scale-[0.97]">
-                <div class="flex h-12 w-12 items-center justify-center rounded-full border-2 border-green-500/40 bg-green-500/10 group-hover:border-green-400">
-                  <svg class="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                  </svg>
-                </div>
-                <span class="text-xs font-medium text-white">Admin GPS Scan</span>
-                <span class="text-[10px] text-orange-400">Hybrid Geolocation</span>
+          <!-- Quick Action Buttons -->
+          <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
+            <h2 class="text-xs font-semibold text-green-400 mb-2">Quick Actions</h2>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="quick-gps-btn" class="quick-action-btn rounded-lg border border-green-500/30 bg-green-500/10 py-2 text-xs font-medium text-green-400 hover:bg-green-500/20 transition">
+                📍 GPS Scan
+              </button>
+              <button id="quick-status-btn" class="quick-action-btn rounded-lg border border-orange-500/30 bg-orange-500/10 py-2 text-xs font-medium text-orange-400 hover:bg-orange-500/20 transition">
+                📊 Status
+              </button>
+              <button id="quick-battery-btn" class="quick-action-btn rounded-lg border border-yellow-500/30 bg-yellow-500/10 py-2 text-xs font-medium text-yellow-400 hover:bg-yellow-500/20 transition">
+                🔋 Battery
+              </button>
+              <button id="quick-network-btn" class="quick-action-btn rounded-lg border border-blue-500/30 bg-blue-500/10 py-2 text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition">
+                📶 Network
+              </button>
+              <button id="quick-clear-btn" class="quick-action-btn rounded-lg border border-purple-500/30 bg-purple-500/10 py-2 text-xs font-medium text-purple-400 hover:bg-purple-500/20 transition">
+                🗑️ Clear
+              </button>
+              <button id="back-to-menu-btn" class="quick-action-btn rounded-lg border border-red-500/30 bg-red-500/10 py-2 text-xs font-medium text-red-400 hover:bg-red-500/20 transition">
+                ↩ กลับสู่เมนูหน้าแรก
               </button>
             </div>
+          </div>
 
-            <!-- Player Target Matrix -->
-            <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
-              <div class="flex items-center justify-between mb-2">
-                <div>
-                  <h2 class="text-xs font-semibold text-green-400">Player Target Matrix</h2>
-                  <p class="text-[10px] text-orange-400">คลิกชื่อเพื่อแก้ไข · เลือกเพื่อโฟกัสแผนที่</p>
-                </div>
-                <button id="add-player-btn" title="Add Target"
-                  class="h-6 w-6 rounded border border-neutral-700 text-green-400 text-sm hover:border-green-500/50 transition">+</button>
+          <!-- System Info -->
+          <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
+            <h2 class="text-xs font-semibold text-green-400 mb-2">System Info</h2>
+            <dl class="space-y-1.5 text-[10px] sm:text-xs">
+              <div class="flex justify-between gap-2">
+                <dt class="text-orange-400">Session</dt>
+                <dd id="info-session" class="text-white truncate">—</dd>
               </div>
-              <div id="player-list" class="space-y-2"></div>
-            </div>
-
-            <!-- Quick Action Buttons -->
-            <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
-              <h2 class="text-xs font-semibold text-green-400 mb-2">Quick Actions</h2>
-              <div class="grid grid-cols-2 gap-2">
-                <button id="quick-gps-btn" class="quick-action-btn rounded-lg border border-green-500/30 bg-green-500/10 py-2 text-xs font-medium text-green-400 hover:bg-green-500/20 transition">
-                  📍 GPS Scan
-                </button>
-                <button id="quick-status-btn" class="quick-action-btn rounded-lg border border-orange-500/30 bg-orange-500/10 py-2 text-xs font-medium text-orange-400 hover:bg-orange-500/20 transition">
-                  📊 Status
-                </button>
-                <button id="quick-battery-btn" class="quick-action-btn rounded-lg border border-yellow-500/30 bg-yellow-500/10 py-2 text-xs font-medium text-yellow-400 hover:bg-yellow-500/20 transition">
-                  🔋 Battery
-                </button>
-                <button id="quick-network-btn" class="quick-action-btn rounded-lg border border-blue-500/30 bg-blue-500/10 py-2 text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition">
-                  📶 Network
-                </button>
-                <button id="quick-clear-btn" class="quick-action-btn rounded-lg border border-purple-500/30 bg-purple-500/10 py-2 text-xs font-medium text-purple-400 hover:bg-purple-500/20 transition">
-                  🗑️ Clear
-                </button>
-                <button id="back-to-menu-btn" class="quick-action-btn rounded-lg border border-red-500/30 bg-red-500/10 py-2 text-xs font-medium text-red-400 hover:bg-red-500/20 transition">
-                  ↩ กลับสู่เมนูหน้าแรก
-                </button>
+              <div class="flex justify-between gap-2">
+                <dt class="text-orange-400">Active Target</dt>
+                <dd id="info-active-target" class="text-white truncate">Admin</dd>
               </div>
-            </div>
-
-            <!-- System Info -->
-            <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
-              <h2 class="text-xs font-semibold text-green-400 mb-2">System Info</h2>
-              <dl class="space-y-1.5 text-[10px] sm:text-xs">
-                <div class="flex justify-between gap-2">
-                  <dt class="text-orange-400">Session</dt>
-                  <dd id="info-session" class="text-white truncate">—</dd>
-                </div>
-                <div class="flex justify-between gap-2">
-                  <dt class="text-orange-400">Active Target</dt>
-                  <dd id="info-active-target" class="text-white truncate">Admin</dd>
-                </div>
-                <div class="flex justify-between gap-2">
-                  <dt class="text-orange-400">GPS Status</dt>
-                  <dd id="info-gps" class="text-white">Idle</dd>
-                </div>
-                <div class="flex justify-between gap-2">
-                  <dt class="text-orange-400">Last Action</dt>
-                  <dd id="info-last-action" class="text-white truncate">—</dd>
-                </div>
-              </dl>
-            </div>
+              <div class="flex justify-between gap-2">
+                <dt class="text-orange-400">GPS Status</dt>
+                <dd id="info-gps" class="text-white">Idle</dd>
+              </div>
+              <div class="flex justify-between gap-2">
+                <dt class="text-orange-400">Last Action</dt>
+                <dd id="info-last-action" class="text-white truncate">—</dd>
+              </div>
+            </dl>
           </div>
-        </aside>
-
-        <!-- CENTER: Tactical Map Monitor -->
-        <div class="flex-1 flex flex-col min-h-0 min-w-0">
-          <div class="shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-neutral-800 bg-neutral-900/80">
-            <span class="text-[10px] sm:text-xs font-mono text-orange-400">Tactical Map Monitor — Chumphon HQ</span>
-            <span id="map-coords-display" class="text-[10px] font-mono text-white/60">—</span>
-          </div>
-          <div id="tactical-map" class="flex-1 min-h-[200px] bg-neutral-900 z-0"></div>
         </div>
-      </div>
+      </aside>
 
-      <!-- BOTTOM: CMD Console Terminal -->
-      <section id="console-panel" class="shrink-0 h-[38vh] sm:h-[32vh] lg:h-[28vh] flex flex-col border-t border-neutral-800 bg-neutral-900">
-        <div class="shrink-0 flex items-center gap-2 border-b border-neutral-800 px-3 py-2">
-          <div class="flex gap-1.5">
-            <span class="h-2.5 w-2.5 rounded-full bg-red-500/80"></span>
-            <span class="h-2.5 w-2.5 rounded-full bg-orange-400/80"></span>
-            <span class="h-2.5 w-2.5 rounded-full bg-green-500/80"></span>
-          </div>
-          <span class="ml-1 font-mono text-[10px] sm:text-xs text-orange-400">CMD Command Console Terminal</span>
-          <span id="console-clock" class="ml-auto font-mono text-[10px] text-neutral-500"></span>
+      <!-- CENTER COLUMN: Map + Command Input -->
+      <div class="flex-1 flex flex-col min-h-0 min-w-0">
+        
+        <!-- Map Header -->
+        <div class="shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-neutral-800 bg-neutral-900/80">
+          <span class="text-[10px] sm:text-xs font-mono text-orange-400">Tactical Map Monitor — Chumphon HQ</span>
+          <span id="map-coords-display" class="text-[10px] font-mono text-white/60">—</span>
         </div>
+        
+        <!-- Map Container -->
+        <div id="tactical-map" class="flex-1 min-h-[200px] bg-neutral-900 z-0"></div>
 
-        <div id="console-output" class="console-scroll flex-1 overflow-y-auto px-3 py-2 font-mono text-xs sm:text-sm leading-relaxed"></div>
-
-        <div class="shrink-0 border-t border-neutral-800 p-2 sm:p-3">
+        <!-- Console Output (Hidden but needed for JS) -->
+        <div id="console-output" class="hidden"></div>
+        <span id="console-clock" class="hidden"></span>
+        
+        <!-- Command Input (Moved below map) -->
+        <div class="shrink-0 border-t border-neutral-800 p-2 sm:p-3 bg-neutral-900">
           <form id="command-form" class="flex items-center gap-2">
             <span class="hidden sm:inline shrink-0 font-mono text-sm text-green-400">></span>
             <input type="text" id="command-input" autocomplete="off" spellcheck="false"
@@ -272,7 +253,102 @@
             <button type="submit" class="shrink-0 rounded-lg bg-neutral-700 px-3 py-2 font-mono text-[10px] sm:text-xs text-white hover:bg-green-600 transition">RUN</button>
           </form>
         </div>
-      </section>
+      </div>
+
+      <!-- RIGHT SIDEBAR: Compact Player List with Accordion -->
+      <aside id="right-sidebar" class="w-full lg:w-64 xl:w-72 shrink-0 border-t lg:border-t-0 lg:border-l border-neutral-800 bg-neutral-900 overflow-y-auto max-h-[40vh] lg:max-h-none sidebar-drawer">
+        <div class="p-3 sm:p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-xs font-semibold text-green-400">Player Targets</h2>
+            <button id="add-player-btn" title="Add Target"
+              class="h-6 w-6 rounded border border-neutral-700 text-green-400 text-sm hover:border-green-500/50 transition">+</button>
+          </div>
+          <div id="player-list" class="space-y-2"></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ========== LEFT SLIDING DRAWER (Mobile) ========== -->
+  <div id="left-drawer" class="hidden fixed inset-y-0 left-0 z-50 w-full max-w-md transform transition-transform duration-300 ease-in-out">
+    <div class="h-full flex flex-col bg-neutral-900 border-r border-neutral-800">
+      <!-- Drawer Header -->
+      <div class="shrink-0 flex items-center justify-between p-4 border-b border-neutral-800">
+        <h2 class="text-lg font-bold text-green-400">เมนูควบคุม</h2>
+        <button id="left-drawer-close" class="text-neutral-400 hover:text-white transition">
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Drawer Content -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-4">
+        <!-- GPS Module -->
+        <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
+          <h2 class="text-xs font-semibold text-green-400 mb-0.5">Control Panel Matrix</h2>
+          <p class="text-[10px] text-orange-400 mb-3">Admin GPS — ระบุพิกัดเครื่องปัจจุบัน</p>
+          <button id="drawer-gps-btn" title="Activate Admin GPS"
+            class="group flex w-full flex-col items-center gap-1.5 rounded-xl border border-neutral-700 bg-neutral-800/50 p-4 transition hover:border-green-500/40 hover:bg-green-500/5 active:scale-[0.97]">
+            <div class="flex h-12 w-12 items-center justify-center rounded-full border-2 border-green-500/40 bg-green-500/10 group-hover:border-green-400">
+              <svg class="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+              </svg>
+            </div>
+            <span class="text-xs font-medium text-white">Admin GPS Scan</span>
+            <span class="text-[10px] text-orange-400">Hybrid Geolocation</span>
+          </button>
+        </div>
+
+        <!-- Quick Action Buttons -->
+        <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
+          <h2 class="text-xs font-semibold text-green-400 mb-2">Quick Actions</h2>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="drawer-quick-gps-btn" class="quick-action-btn rounded-lg border border-green-500/30 bg-green-500/10 py-2 text-xs font-medium text-green-400 hover:bg-green-500/20 transition">
+              📍 GPS Scan
+            </button>
+            <button id="drawer-quick-status-btn" class="quick-action-btn rounded-lg border border-orange-500/30 bg-orange-500/10 py-2 text-xs font-medium text-orange-400 hover:bg-orange-500/20 transition">
+              📊 Status
+            </button>
+            <button id="drawer-quick-battery-btn" class="quick-action-btn rounded-lg border border-yellow-500/30 bg-yellow-500/10 py-2 text-xs font-medium text-yellow-400 hover:bg-yellow-500/20 transition">
+              🔋 Battery
+            </button>
+            <button id="drawer-quick-network-btn" class="quick-action-btn rounded-lg border border-blue-500/30 bg-blue-500/10 py-2 text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition">
+              📶 Network
+            </button>
+            <button id="drawer-quick-clear-btn" class="quick-action-btn rounded-lg border border-purple-500/30 bg-purple-500/10 py-2 text-xs font-medium text-purple-400 hover:bg-purple-500/20 transition">
+              🗑️ Clear
+            </button>
+            <button id="drawer-back-to-menu-btn" class="quick-action-btn rounded-lg border border-red-500/30 bg-red-500/10 py-2 text-xs font-medium text-red-400 hover:bg-red-500/20 transition">
+              ↩ กลับสู่เมนูหน้าแรก
+            </button>
+          </div>
+        </div>
+
+        <!-- System Info -->
+        <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
+          <h2 class="text-xs font-semibold text-green-400 mb-2">System Info</h2>
+          <dl class="space-y-1.5 text-[10px] sm:text-xs">
+            <div class="flex justify-between gap-2">
+              <dt class="text-orange-400">Session</dt>
+              <dd id="drawer-info-session" class="text-white truncate">—</dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-orange-400">Active Target</dt>
+              <dd id="drawer-info-active-target" class="text-white truncate">Admin</dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-orange-400">GPS Status</dt>
+              <dd id="drawer-info-gps" class="text-white">Idle</dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-orange-400">Last Action</dt>
+              <dd id="drawer-info-last-action" class="text-white truncate">—</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -297,6 +373,19 @@
           <div id="drawer-player-list" class="space-y-2 max-h-48 overflow-y-auto"></div>
         </div>
 
+        <!-- Hidden elements for drawer data (needed for JS) -->
+        <div class="hidden">
+          <span id="drawer-coords"></span>
+          <a id="drawer-maps-link"></a>
+          <span id="drawer-ip"></span>
+          <span id="drawer-isp"></span>
+          <span id="drawer-os"></span>
+          <span id="drawer-screen"></span>
+          <span id="drawer-battery"></span>
+          <span id="drawer-network"></span>
+          <span id="drawer-distance"></span>
+        </div>
+
         <!-- Notes Section -->
         <div class="rounded-lg border border-neutral-800 bg-neutral-950/50 p-3">
           <h3 class="text-xs font-semibold text-green-400 mb-2">📝 หมายเหตุ</h3>
@@ -315,12 +404,32 @@
           <div id="drawer-location-history" class="space-y-1 max-h-32 overflow-y-auto text-[10px] text-white/80"></div>
         </div>
 
+        <!-- 24-Hour Timeline Section -->
+        <div class="rounded-lg border border-neutral-800 bg-neutral-950/50 p-3">
+          <h3 class="text-xs font-semibold text-green-400 mb-2">⏱️ ไทม์ไลน์ 24 ชม.</h3>
+          <div id="drawer-timeline-history" class="space-y-1 max-h-32 overflow-y-auto text-[10px]"></div>
+        </div>
+
         <!-- Save Button -->
         <button id="drawer-save-notes" class="w-full rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-500 transition">
           บันทึกข้อมูล
         </button>
       </div>
     </div>
+  </div>
+
+  <!-- Mobile Drawer Toggle Buttons (visible on mobile only) -->
+  <div class="mobile-drawer-toggle">
+    <button id="mobile-left-toggle" class="mobile-drawer-btn" title="เปิดเมนูซ้าย">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+    <button id="mobile-right-toggle" class="mobile-drawer-btn" title="เปิดรายชื่อผู้เล่น">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H7v-1a6 6 0 0112 0v1h-5zm-1 0h5v-1a6 6 0 00-7-5.919" />
+      </svg>
+    </button>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>

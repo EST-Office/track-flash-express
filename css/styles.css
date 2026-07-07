@@ -107,6 +107,26 @@ html, body {
   text-decoration: underline;
 }
 
+/* ===== ACCORDION PLAYER DETAILS ===== */
+.player-details {
+  animation: expandIn 0.2s ease-out;
+}
+
+@keyframes expandIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.player-details.hidden {
+  display: none;
+}
+
+/* Status Indicator Styles */
+.status-indicator {
+  display: inline-block;
+  line-height: 1;
+}
+
 /* App Selector Styles */
 .app-card {
   transition: all 0.2s ease;
@@ -182,13 +202,93 @@ html, body {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Loading Screen Overlay */
+/* Loading Screen Overlay - Cyberpunk/Tactical Style */
 #loading-screen {
   backdrop-filter: blur(4px);
 }
 
 #loading-screen.hidden {
   display: none;
+}
+
+.loading-cyberpunk {
+  position: relative;
+  padding: 2rem;
+  border: 2px solid #22c55e;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(10, 10, 10, 0.98) 100%);
+  box-shadow: 0 0 30px rgba(34, 197, 94, 0.3), inset 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.loading-scanline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(34, 197, 94, 0.1) 50%,
+    transparent 100%
+  );
+  animation: scanline 2s linear infinite;
+  pointer-events: none;
+  border-radius: 8px;
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+.loading-content {
+  position: relative;
+  z-index: 1;
+}
+
+.loading-glow {
+  text-shadow: 0 0 10px rgba(34, 197, 94, 0.7), 0 0 20px rgba(251, 146, 60, 0.5);
+  animation: glow-pulse 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes glow-pulse {
+  from { text-shadow: 0 0 5px rgba(34, 197, 94, 0.5); }
+  to { text-shadow: 0 0 15px rgba(34, 197, 94, 0.8), 0 0 25px rgba(251, 146, 60, 0.6); }
+}
+
+.loading-bar-container {
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+#loading-bar {
+  background-size: 200% 100%;
+  animation: loading-bar-glow 2s ease-in-out infinite;
+  position: relative;
+}
+
+#loading-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: loading-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes loading-bar-glow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes loading-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 /* Quick Action Buttons */
@@ -201,12 +301,132 @@ html, body {
   transform: translateY(-1px);
 }
 
-/* Mobile Responsive Improvements */
-@media (max-width: 640px) {
-  #control-panel {
-    max-height: 40vh !important;
+/* ===== 3-COLUMN LAYOUT ===== */
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+#left-sidebar, #right-sidebar {
+  background: #171717;
+  transition: transform 0.3s ease, width 0.3s ease;
+}
+
+.sidebar-drawer {
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+
+.sidebar-drawer::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-drawer::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 2px;
+}
+
+/* ===== MOBILE DRAWER STYLES ===== */
+.mobile-drawer-toggle {
+  display: none;
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 40;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mobile-drawer-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #22c55e;
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+
+.mobile-drawer-btn:hover {
+  background: rgba(34, 197, 94, 0.25);
+  transform: scale(1.05);
+}
+
+#left-drawer, #right-drawer {
+  background: #171717;
+}
+
+#left-drawer.hidden {
+  transform: translateX(-100%);
+}
+
+#left-drawer:not(.hidden) {
+  transform: translateX(0);
+}
+
+#right-drawer.hidden {
+  transform: translateX(100%);
+}
+
+#right-drawer:not(.hidden) {
+  transform: translateX(0);
+}
+
+/* ===== MOBILE RESPONSIVE (3 columns collapse to 1) ===== */
+@media (max-width: 1024px) {
+  /* Hide sidebars on mobile, show as drawers */
+  #left-sidebar, #right-sidebar {
+    display: none;
   }
   
+  /* Show mobile drawer toggle buttons */
+  .mobile-drawer-toggle {
+    display: flex;
+  }
+  
+  /* Adjust map height on mobile */
+  #tactical-map {
+    min-height: 250px;
+  }
+  
+  /* Command input area on mobile */
+  .command-input-mobile {
+    position: sticky;
+    bottom: 0;
+    background: #171717;
+    border-top: 1px solid #262626;
+  }
+}
+
+/* ===== DESKTOP 3-COLUMN LAYOUT ===== */
+@media (min-width: 1024px) {
+  .mobile-drawer-toggle {
+    display: none;
+  }
+  
+  #left-sidebar, #right-sidebar {
+    display: block;
+  }
+  
+  #left-drawer, #right-drawer {
+    display: none !important;
+  }
+}
+
+/* ===== TABLET LANDSCAPE (2 columns) ===== */
+@media (min-width: 768px) and (max-width: 1023px) {
+  #tactical-map {
+    min-height: 300px;
+  }
+}
+
+/* ===== MOBILE PORTRAIT ===== */
+@media (max-width: 767px) {
   #tactical-map {
     min-height: 200px;
   }
@@ -215,16 +435,102 @@ html, body {
     font-size: 9px;
     padding: 4px 2px;
   }
+  
+  /* Adjust header for mobile */
+  header .text-sm {
+    font-size: 12px;
+  }
 }
 
-/* Loading bar animation */
-@keyframes loading-bar-glow {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+/* ===== PWA SUPPORT ===== */
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
 }
 
-#loading-bar {
-  background-size: 200% 100%;
-  animation: loading-bar-glow 2s ease-in-out infinite;
+/* ===== ADDITIONAL ANIMATIONS ===== */
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.drawer-enter-left {
+  animation: slideInLeft 0.3s ease-out;
+}
+
+.drawer-enter-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+/* ===== SCROLLBAR FOR WEBKIT ===== */
+#left-sidebar::-webkit-scrollbar,
+#right-sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+
+#left-sidebar::-webkit-scrollbar-track,
+#right-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#left-sidebar::-webkit-scrollbar-thumb,
+#right-sidebar::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 2px;
+}
+
+#left-sidebar::-webkit-scrollbar-thumb:hover,
+#right-sidebar::-webkit-scrollbar-thumb:hover {
+  background: #525252;
+}
+
+/* ===== TIMELINE HISTORY STYLES ===== */
+#drawer-timeline-history {
+  max-height: 48px;
+  overflow-y: auto;
+}
+
+#drawer-timeline-history::-webkit-scrollbar {
+  width: 3px;
+}
+
+#drawer-timeline-history::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 2px;
+}
+
+/* ===== STATUS INDICATOR COLORS ===== */
+.status-online {
+  color: #4ade80;
+}
+
+.status-recently-offline {
+  color: #fb923c;
+}
+
+.status-offline {
+  color: #a3a3a3;
+}
+
+/* ===== ACCORDION ANIMATION ===== */
+.player-details {
+  transition: all 0.2s ease-in-out;
+}
+
+/* ===== EDIT DESCRIPTION BUTTON ===== */
+.btn-edit-desc {
+  transition: all 0.15s ease;
+}
+
+.btn-edit-desc:hover {
+  background: rgba(168, 85, 247, 0.2);
 }

