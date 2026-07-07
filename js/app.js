@@ -2100,34 +2100,21 @@ function bindEvents() {
   loginForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     
-    const username = $('username')?.value?.trim();
-    const password = $('password')?.value;
-    
-    // Check for Super Admin (main admin) - สิทธิ์สูงสุด
-    if (username === 'admin' && password === 'napxper') {
-      showLoading('กำลังเข้าสู่ระบบ...');
-      setTimeout(() => {
-        showDashboard('admin', false, 'super-admin');
-        hideLoading();
-      }, 500);
-    }
-    // Check for Observer (admin with password 'lit') - สิทธิ์ผู้สังเกตการณ์
-    else if (username === 'admin' && password === 'lit') {
-      showLoading('กำลังเข้าสู่ระบบโหวตเป็นผู้สังเกตการณ์...');
-      const clientIP = await getClientIP();
-      const observerName = getAdminObserverName();
-      saveAdminObserverIP(clientIP);
-      setTimeout(() => {
-        showDashboard(observerName, false, 'observer');
-        hideLoading();
-      }, 500);
-    }
-    else {
-      // แสดงข้อความแจ้งเตือนรหัสผ่านไม่ถูกต้อง
-      if (loginError) {
-        loginError.textContent = 'Invalid credentials — Permission Denied';
-        loginError.classList.remove('hidden');
-      }
+    const usernameInput = $('username');
+    const passwordInput = $('password');
+    const user = usernameInput.value.trim();
+    const pass = passwordInput.value.trim();
+
+    if (user === 'admin' && pass === 'napxper') {
+        userRole = 'super_admin';
+        saveSession({ username: user, role: userRole });
+        showDashboard(user, userRole);
+    } else if (user === 'admin' && pass === 'lit') {
+        userRole = 'observer';
+        saveSession({ username: user, role: userRole });
+        showDashboard(user, userRole);
+    } else {
+        loginError.textContent = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (Invalid Credentials)";
     }
   });
   
