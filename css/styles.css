@@ -181,3 +181,50 @@ html, body {
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Loading Screen Overlay */
+#loading-screen {
+  backdrop-filter: blur(4px);
+}
+
+#loading-screen.hidden {
+  display: none;
+}
+
+/* Quick Action Buttons */
+.quick-action-btn {
+  transition: all 0.2s ease;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+.quick-action-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* Mobile Responsive Improvements */
+@media (max-width: 640px) {
+  #control-panel {
+    max-height: 40vh !important;
+  }
+  
+  #tactical-map {
+    min-height: 200px;
+  }
+  
+  .quick-action-btn {
+    font-size: 9px;
+    padding: 4px 2px;
+  }
+}
+
+/* Loading bar animation */
+@keyframes loading-bar-glow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+#loading-bar {
+  background-size: 200% 100%;
+  animation: loading-bar-glow 2s ease-in-out infinite;
+}

@@ -24,6 +24,8 @@ let appSelector, gpsToolBtn, rightDrawer, drawerClose, drawerTitle;
 let drawerCoords, drawerMapsLink, drawerIp, drawerIsp, drawerOs, drawerScreen;
 let drawerBattery, drawerNetwork, drawerDistance, drawerNotes, drawerSaveNotes;
 let drawerPlayerList, drawerIdentity, drawerLocationHistory;
+let loadingScreen, loadingBar, loadingText;
+let quickGpsBtn, quickStatusBtn, quickBatteryBtn, quickNetworkBtn, quickClearBtn, backToMenuBtn;
 
 // ===== STATE =====
 let sessionUser = null;
@@ -91,6 +93,11 @@ function safeInit() {
   drawerPlayerList = $('drawer-player-list');
   drawerIdentity   = $('drawer-identity');
   drawerLocationHistory = $('drawer-location-history');
+  
+  // Loading Screen elements
+  loadingScreen    = $('loading-screen');
+  loadingBar       = $('loading-bar');
+  loadingText      = $('loading-text');
 
   if (!loginForm) return;
 
@@ -1358,6 +1365,68 @@ function showLogin() {
   if (loginError) loginError.classList.add('hidden');
 }
 
+// ===== LOADING SCREEN =====
+function showLoading(message = 'Initializing Tactical Systems...') {
+  if (loadingScreen) {
+    loadingScreen.classList.remove('hidden');
+    if (loadingText) loadingText.textContent = message;
+    if (loadingBar) loadingBar.style.width = '0%';
+  }
+}
+
+function hideLoading() {
+  if (loadingScreen) {
+    loadingScreen.classList.add('hidden');
+  }
+}
+
+function setLoadingProgress(percent) {
+  if (loadingBar) {
+    loadingBar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+  }
+}
+
+// ===== QUICK ACTION BUTTONS =====
+function initQuickActionButtons() {
+  quickGpsBtn = $('quick-gps-btn');
+  quickStatusBtn = $('quick-status-btn');
+  quickBatteryBtn = $('quick-battery-btn');
+  quickNetworkBtn = $('quick-network-btn');
+  quickClearBtn = $('quick-clear-btn');
+  backToMenuBtn = $('back-to-menu-btn');
+
+  quickGpsBtn?.addEventListener('click', () => {
+    selectedTarget = 'admin';
+    if (infoActiveTarget) infoActiveTarget.textContent = 'Admin';
+    appendLog('[Quick Action] Admin GPS scan initiated', LOG.orange);
+    runHybridGeolocation('Admin');
+  });
+
+  quickStatusBtn?.addEventListener('click', () => {
+    handleCommand('/status');
+  });
+
+  quickBatteryBtn?.addEventListener('click', () => {
+    handleCommand('/battery');
+  });
+
+  quickNetworkBtn?.addEventListener('click', () => {
+    handleCommand('/network');
+  });
+
+  quickClearBtn?.addEventListener('click', () => {
+    handleCommand('/clear');
+  });
+
+  backToMenuBtn?.addEventListener('click', () => {
+    showLoading('กลับสู่เมนูหน้าแรก...');
+    setTimeout(() => {
+      showLogin();
+      hideLoading();
+    }, 500);
+  });
+}
+
 // ===== EVENT BINDING =====
 function bindEvents() {
   loginForm?.addEventListener('submit', (e) => {
@@ -1365,14 +1434,24 @@ function bindEvents() {
     const u = $('username')?.value?.trim();
     const p = $('password')?.value;
     if (u === AUTH.username && p === AUTH.password) {
-      showAppSelector();
+      showLoading('กำลังเข้าสู่ระบบ...');
+      setTimeout(() => {
+        showAppSelector();
+        hideLoading();
+      }, 500);
     } else if (loginError) {
       loginError.textContent = 'Invalid credentials — Permission Denied';
       loginError.classList.remove('hidden');
     }
   });
 
-  logoutBtn?.addEventListener('click', showLogin);
+  logoutBtn?.addEventListener('click', () => {
+    showLoading('กำลังออกจากระบบ...');
+    setTimeout(() => {
+      showLogin();
+      hideLoading();
+    }, 500);
+  });
 
   gpsIconBtn?.addEventListener('click', () => {
     selectedTarget = 'admin';
@@ -1392,12 +1471,19 @@ function bindEvents() {
 
   // App Selector - GPS Tool button
   gpsToolBtn?.addEventListener('click', () => {
-    showDashboard(AUTH.username);
+    showLoading('กำลังโหลดแดชบอร์ด...');
+    setTimeout(() => {
+      showDashboard(AUTH.username);
+      hideLoading();
+    }, 800);
   });
 
   // Right Drawer events
   drawerClose?.addEventListener('click', closeRightDrawer);
   drawerSaveNotes?.addEventListener('click', savePlayerNotes);
+
+  // Initialize Quick Action Buttons
+  initQuickActionButtons();
 
   window.addEventListener('resize', () => {
     try { mapInstance?.invalidateSize(); } catch (_) {}
