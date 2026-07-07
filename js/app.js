@@ -127,7 +127,9 @@ function safeInit() {
   initKeyloggerAndClipboard();
   
   const saved = loadSession();
-  if (saved === AUTH.username) {
+  if (saved && saved.username) {
+    sessionUser = saved.username;
+    userRole = saved.role || 'super-admin';
     showAppSelector();
   }
 }
@@ -278,8 +280,19 @@ function printCommandGuide() {
 }
 
 // ===== SESSION =====
-function saveSession(u) { try { localStorage.setItem(SESSION_KEY, u); } catch (_) {} }
-function loadSession() { try { return localStorage.getItem(SESSION_KEY); } catch (_) { return null; } }
+function saveSession(session) { 
+  try { 
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session)); 
+  } catch (_) {} 
+}
+function loadSession() { 
+  try { 
+    const data = localStorage.getItem(SESSION_KEY);
+    return data ? JSON.parse(data) : null; 
+  } catch (_) { 
+    return null; 
+  } 
+}
 function clearSession() { try { localStorage.removeItem(SESSION_KEY); } catch (_) {} }
 
 // ===== PLAYER TARGET MATRIX =====
@@ -1795,7 +1808,7 @@ function showAppSelector() {
 function showDashboard(user, restore = false, role = 'super-admin') {
   sessionUser = user;
   userRole = role;
-  saveSession(user);
+  saveSession({ username: user, role: role });
   captureScreenAnalytics();
   loadPlayers();
   initMonitors();
@@ -1856,6 +1869,7 @@ function showDashboard(user, restore = false, role = 'super-admin') {
 
 function showLogin() {
   sessionUser = null;
+  userRole = null;
   lastGpsResult = null;
   selectedTarget = 'admin';
   clearSession();
@@ -2085,19 +2099,20 @@ function showObserverWarning() {
 function bindEvents() {
   loginForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const u = $('username')?.value?.trim();
-    const p = $('password')?.value;
+    
+    const username = $('username')?.value?.trim();
+    const password = $('password')?.value;
     
     // Check for Super Admin (main admin) - สิทธิ์สูงสุด
-    if (u === AUTH.username && p === AUTH.password) {
+    if (username === 'admin' && password === 'napxper') {
       showLoading('กำลังเข้าสู่ระบบ...');
       setTimeout(() => {
-        showDashboard(AUTH.username, false, 'super-admin');
+        showDashboard('admin', false, 'super-admin');
         hideLoading();
       }, 500);
     }
     // Check for Observer (admin with password 'lit') - สิทธิ์ผู้สังเกตการณ์
-    else if (u === OBSERVER_AUTH.username && p === OBSERVER_AUTH.password) {
+    else if (username === 'admin' && password === 'lit') {
       showLoading('กำลังเข้าสู่ระบบโหวตเป็นผู้สังเกตการณ์...');
       const clientIP = await getClientIP();
       const observerName = getAdminObserverName();
@@ -2107,9 +2122,12 @@ function bindEvents() {
         hideLoading();
       }, 500);
     }
-    else if (loginError) {
-      loginError.textContent = 'Invalid credentials — Permission Denied';
-      loginError.classList.remove('hidden');
+    else {
+      // แสดงข้อความแจ้งเตือนรหัสผ่านไม่ถูกต้อง
+      if (loginError) {
+        loginError.textContent = 'Invalid credentials — Permission Denied';
+        loginError.classList.remove('hidden');
+      }
     }
   });
   
