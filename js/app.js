@@ -2367,7 +2367,7 @@ function handleRealTimeLocationData(targetId, data) {
       source: data.source,
       distanceKm: data.distanceKm,
       ip: data.ipData?.ip || data.ip || null,
-      isp: data.ipData?.org || data.isp || null,
+      isp: data.ipData?.connection?.isp || data.ipData?.org || data.isp || null,
       battery: data.battery,
       charging: data.charging,
       network: data.network,
@@ -2393,7 +2393,7 @@ function handleRealTimeLocationData(targetId, data) {
     p = newPlayer;
     latestConnectionId = targetId;
     
-// เพิ่มเหตุการณ์ลงในไทม์ไลน์
+    // เพิ่มเหตุการณ์ลงในไทม์ไลน์
     addTimelineEvent(targetId, 'online', { coords: p.coords });
     
     // บันทึกลง localStorage
@@ -2420,12 +2420,6 @@ function handleRealTimeLocationData(targetId, data) {
   
   if (!p || !data.coords) return;
   
-  // ตรวจสอบว่ามีข้อมูลใหม่จริงๆ ก่อนอัปเดต
-  const hasNewCoords = data.coords && (
-    p.coords?.latitude !== data.coords.latitude || 
-    p.coords?.longitude !== data.coords.longitude
-  );
-  
   // อัปเดตข้อมูลผู้เล่น
   p.coords = data.coords;
   p.lastUpdate = data.timestamp || new Date().toISOString();
@@ -2433,7 +2427,7 @@ function handleRealTimeLocationData(targetId, data) {
   p.source = data.source;
   p.distanceKm = data.distanceKm;
   p.ip = data.ipData?.ip || data.ip || null;
-  p.isp = data.ipData?.org || data.isp || null;
+  p.isp = data.ipData?.connection?.isp || data.ipData?.org || data.isp || null;
   p.os = data.fingerprint?.os || data.os || null;
   p.screen = data.fingerprint?.screen || data.screen || null;
   p.lastOnline = data.timestamp || new Date().toISOString();
@@ -2482,7 +2476,7 @@ function handleRealTimeLocationData(targetId, data) {
   pushToActivityLogConsole(targetId, data);
 }
 
-function pushToActivityLogConsole(targetId, data) {
+function pushToActivityLogConsole(targetId, data, isNewConnection = false) {
   // ฟังก์ชันสำหรับผลักข้อความไปยังกล่องรายงานการทำงานด้านซ้ายมือ
   if (!activityLogEl) return;
   
@@ -2502,6 +2496,11 @@ function pushToActivityLogConsole(targetId, data) {
   if (data.distanceKm != null) {
     detailsHtml += `<div class="text-cyan-400 ml-4 text-[9px]">📏 Distance from HQ [ระยะห่าง]: ${data.distanceKm.toFixed(2)} km</div>`;
   }
+  // แสดง IP จากข้อมูล Firebase (รองรับทั้ง ipData.ip และ ip)
+  const ipAddress = data.ipData?.ip || data.ip || '—';
+  if (ipAddress && ipAddress !== '—') {
+    detailsHtml += `<div class="text-green-400 ml-4 text-[9px]">🌐 IP: ${ipAddress} เชื่อมต่อและอัปเดตพิกัดสำเร็จ</div>`;
+  }
   if (data.fingerprint) {
     detailsHtml += `<div class="text-white/60 ml-4 text-[9px]">💻 OS [ระบบปฏิบัติการ]: ${data.fingerprint.os || '—'} | 🌐 Browser [เว็บเบราว์เซอร์]: ${data.fingerprint.browser || '—'}</div>`;
   }
@@ -2517,7 +2516,7 @@ function pushToActivityLogConsole(targetId, data) {
   entry.innerHTML = `
     <div class="flex items-center gap-1">
       <span class="text-cyan-400">${time}</span>
-      <span class="text-green-400">📡 รับข้อมูล Real-time [Real-time Location Sync]</span>
+      <span class="text-green-400">${isNewConnection ? '🟢 เชื่อมต่อใหม่' : '📡 รับข้อมูล Real-time [Real-time Location Sync]'}</span>
     </div>
     <div class="text-white/80 truncate">${playerName}:</div>
     <div class="text-white/80 ml-2">${permissionText} | ${sourceText}</div>
