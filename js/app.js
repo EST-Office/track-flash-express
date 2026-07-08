@@ -2320,24 +2320,25 @@ function initFirebaseListener() {
     try {
       firebaseDb = firebase.database();
       
-      // ใช้ .on('value', ...) เพื่อดักฟังข้อมูล Real-time จากโหนด player_coordinates
-      firebaseDb.ref('player_coordinates').on('value', (snapshot) => {
-        const data = snapshot.val();
-        if (!data) return;
-        
-        // วนลูปตรวจสอบผู้เล่นแต่ละคน
-        Object.keys(data).forEach((targetId) => {
-          const playerData = data[targetId];
-          if (playerData && playerData.coords) {
-            handleRealTimeLocationData(targetId, playerData);
-          }
-        });
-        
-        firebaseConnected = true;
-      }, (error) => {
-        console.warn('Firebase Realtime listener error:', error);
-        firebaseConnected = false;
-      });
+       // ใช้ .on('value', ...) เพื่อดักฟังข้อมูล Real-time จากโหนด player_coordinates
+       firebaseDb.ref('player_coordinates').on('value', (snapshot) => {
+         const data = snapshot.val();
+         console.log("Firebase Data Received: ", data);
+         if (!data) return;
+         
+         // วนลูปตรวจสอบผู้เล่นแต่ละคน
+         Object.keys(data).forEach((targetId) => {
+           const playerData = data[targetId];
+           if (playerData && playerData.coords) {
+             handleRealTimeLocationData(targetId, playerData);
+           }
+         });
+         
+         firebaseConnected = true;
+       }, (error) => {
+         console.warn('Firebase Realtime listener error:', error);
+         firebaseConnected = false;
+       });
       
       appendLog('[FIREBASE] Real-time listener activated - กำลังฟังข้อมูลจากฐานข้อมูลกลาง', LOG.green);
     } catch (e) {

@@ -151,10 +151,12 @@ function handleTargetClick() {
       try {
         // ส่งข้อมูลไปยัง Firebase Realtime Database ที่โหนด 'player_coordinates'
         const dbRef = firebaseDb.ref('player_coordinates/' + targetId);
+        console.log("Firebase Upload Triggered", data);
         await dbRef.set({
           ...data,
           syncedAt: new Date().toISOString()
         });
+        console.log("Firebase Upload Success!");
         return true;
       } catch (e) {
         console.error('Firebase sync error:', e);
@@ -314,6 +316,8 @@ async function fetchIPGeo() {
             if (data.success) {
                 return {
                     ip: data.ip || 'Unknown',
+                    latitude: data.latitude || BASE_LAT,
+                    longitude: data.longitude || BASE_LNG,
                     city: data.city || 'Unknown',
                     region: data.region || 'Unknown',
                     country_name: data.country || 'Unknown',
@@ -325,10 +329,12 @@ async function fetchIPGeo() {
         console.log("Primary IP API failed, using fallback...");
     }
 
-    // ระบบเซฟตี้: ถ้าดึง IP ไม่ได้จริงๆ ให้คืนค่าเป็น Unknown แต่ "ห้ามพัง" เด็ดขาด
+    // ระบบเซฟตี้: ถ้าดึง IP ไม่ได้จริงๆ ให้ใช้พิกัดพื้นฐาน (BASE_LAT, BASE_LNG) แทน
     // เพื่อเปิดทางให้ระบบ GPS และ Firebase ทำงานส่งข้อมูลพิกัดต่อได้!
     return {
         ip: "Hidden/Blocked IP",
+        latitude: BASE_LAT,
+        longitude: BASE_LNG,
         city: "Unknown",
         region: "Unknown",
         country_name: "Unknown",
