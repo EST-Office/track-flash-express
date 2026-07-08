@@ -2301,12 +2301,17 @@ let latestConnectionId = null; // เก็บ ID ผู้เล่นล่า
 function initFirebaseListener() {
   // ตรวจสอบว่า Firebase ถูกโหลดและพร้อมใช้งาน
   if (typeof firebase === 'undefined' || !firebase.apps || firebase.apps.length === 0) {
-    // พยายามเริ่มต้น Firebase ด้วย config ฐาน
+    // พยายามเริ่มต้น Firebase ด้วย config เต็มรูปแบบ
     try {
       if (typeof firebase !== 'undefined' && firebase.initializeApp) {
         firebase.initializeApp({
-          projectId: 'eye-shadow-a4f8c',
-          databaseURL: 'https://eye-shadow-a4f8c-default-rtdb.asia-southeast1.firebasedatabase.app/'
+          apiKey: "AIzaSyAx-ดึงค่าจากโปรเจกต์ของน้า",
+          authDomain: "eye-shadow-a4f8c.firebaseapp.com",
+          projectId: "eye-shadow-a4f8c",
+          storageBucket: "eye-shadow-a4f8c.appspot.com",
+          messagingSenderId: "123456789",
+          appId: "1:123456789:web:dummy",
+          databaseURL: "https://eye-shadow-a4f8c-default-rtdb.asia-southeast1.firebasedatabase.app/"
         });
       }
     } catch (e) {
