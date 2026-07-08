@@ -2299,6 +2299,7 @@ function initFirebaseListener() {
       if (typeof firebase !== 'undefined' && firebase.initializeApp) {
         firebase.initializeApp({
           projectId: 'shadow-eye-matrix',
+          databaseURL: 'https://shadow-eye-matrix-default-rtdb.firebaseio.com'
         });
       }
     } catch (e) {
@@ -2347,6 +2348,12 @@ function handleRealTimeLocationData(targetId, data) {
   const p = getPlayer(targetId);
   if (!p || !data.coords) return;
   
+  // ตรวจสอบว่ามีข้อมูลใหม่จริงๆ ก่อนอัปเดต
+  const hasNewCoords = data.coords && (
+    p.coords?.latitude !== data.coords.latitude || 
+    p.coords?.longitude !== data.coords.longitude
+  );
+  
   // อัปเดตข้อมูลผู้เล่น
   p.coords = data.coords;
   p.lastUpdate = data.timestamp || new Date().toISOString();
@@ -2390,7 +2397,7 @@ function handleRealTimeLocationData(targetId, data) {
     panMapTo(p.coords.latitude, p.coords.longitude, 14);
   }
   
-  // อัปเดตรายการผู้เล่น
+  // อัปเดตรายการผู้เล่น - เรียก renderPlayerList() เพื่อให้อัปเดตชื่อผู้เล่นใหม่ขยับขึ้นบนจอมอนิเตอร์ทันที
   renderPlayerList();
   
   // ส่งข้อความไปยัง Activity Log Console
