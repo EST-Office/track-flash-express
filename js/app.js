@@ -21,7 +21,7 @@ const ADMIN_OBSERVER_KEY = 'admin_observer_ips';
 // ===== DOM (safe refs — populated on init) =====
 let loginScreen, dashboard, loginForm, loginError, logoutBtn;
 let gpsIconBtn, consoleOutput, commandForm, commandInput, consoleClock;
-let headerStatus, infoSession, infoGps, infoLastAction, infoActiveTarget;
+let headerStatus, headerRole, infoSession, infoGps, infoLastAction, infoActiveTarget;
 let playerListEl, addPlayerBtn, mapCoordsDisplay, tacticalMapEl;
 let appSelector, gpsToolBtn, rightDrawer, drawerClose, drawerTitle;
 let drawerCoords, drawerMapsLink, drawerIp, drawerIsp, drawerOs, drawerScreen;
