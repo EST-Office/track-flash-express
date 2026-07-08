@@ -2182,11 +2182,17 @@ function bindEvents() {
     handleCommand(v);
   });
   
-  // App Selector - GPS Tool button
+// App Selector - GPS Tool button
   gpsToolBtn?.addEventListener('click', () => {
     showLoading('กำลังโหลดแดชบอร์ด...');
     setTimeout(() => {
-      showDashboard(AUTH.username, false, 'super-admin');
+      // ซ่อนหน้าเลือกเครื่องมือและเปิดแสดงหน้าแดชบอร์ดแผนที่
+      if (appSelector) appSelector.classList.add('hidden');
+      if (dashboard) dashboard.classList.remove('hidden');
+      if (loadingScreen) loadingScreen.classList.add('hidden');
+      // เริ่มต้นแผนที่
+      initMap();
+      try { mapInstance?.invalidateSize(); } catch (_) {}
       hideLoading();
     }, 800);
   });
