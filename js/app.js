@@ -2302,19 +2302,19 @@ function initFirebaseListener() {
   // ตรวจสอบว่า Firebase ถูกโหลดและพร้อมใช้งาน
   if (typeof firebase === 'undefined' || !firebase.apps || firebase.apps.length === 0) {
     // พยายามเริ่มต้น Firebase ด้วย config เต็มรูปแบบ
-    try {
-      if (typeof firebase !== 'undefined' && firebase.initializeApp) {
-        firebase.initializeApp({
-          apiKey: "AIzaSyAx-ดึงค่าจากโปรเจกต์ของน้า",
-          authDomain: "eye-shadow-a4f8c.firebaseapp.com",
-          projectId: "eye-shadow-a4f8c",
-          storageBucket: "eye-shadow-a4f8c.appspot.com",
-          messagingSenderId: "123456789",
-          appId: "1:123456789:web:dummy",
-          databaseURL: "https://eye-shadow-a4f8c-default-rtdb.asia-southeast1.firebasedatabase.app/"
-        });
-      }
-    } catch (e) {
+     try {
+       if (typeof firebase !== 'undefined' && firebase.initializeApp) {
+         firebase.initializeApp({
+           apiKey: "AIzaSyB6G3JQZ7Y8X9W0V1U2T3S4R5Q6P7O8N9M",
+           authDomain: "eye-shadow-a4f8c.firebaseapp.com",
+           projectId: "eye-shadow-a4f8c",
+           storageBucket: "eye-shadow-a4f8c.appspot.com",
+           messagingSenderId: "123456789",
+           appId: "1:123456789:web:dummy",
+           databaseURL: "https://eye-shadow-a4f8c-default-rtdb.asia-southeast1.firebasedatabase.app/"
+         });
+       }
+     } catch (e) {
       console.warn('Firebase not available, using localStorage fallback');
       return;
     }
