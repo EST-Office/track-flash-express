@@ -147,6 +147,11 @@
         <span id="header-mode" class="hidden text-[10px] text-orange-400 sm:inline font-mono">MODE: ACTIVE</span>
         <span id="header-status" class="text-[10px] sm:text-xs text-white">Ready</span>
         <span id="header-role" class="hidden text-[10px] sm:inline font-mono text-cyan-400"></span>
+        <!-- Admin Account Icon (Top-Right) -->
+        <div id="admin-account-icon" class="hidden items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/50 px-2 py-1 sm:px-3 sm:py-1.5 transition hover:border-green-500/50">
+          <span id="admin-icon-symbol" class="text-lg sm:text-xl"></span>
+          <span id="admin-icon-text" class="text-[10px] sm:text-xs font-medium text-white"></span>
+        </div>
         <button id="logout-btn" class="rounded-lg border border-neutral-700 px-2 py-1 text-[10px] sm:px-3 sm:py-1.5 sm:text-xs text-white hover:border-red-500/50 hover:text-red-400 transition">
           Logout
         </button>
@@ -160,11 +165,11 @@
        <aside id="left-sidebar" class="w-full lg:w-64 xl:w-72 shrink-0 border-b lg:border-b-0 lg:border-r border-neutral-800 bg-neutral-900 overflow-y-auto max-h-[40vh] lg:max-h-none sidebar-drawer">
          <div class="p-3 sm:p-4 space-y-3">
          
-           <!-- Activity Log Console -->
-           <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
-             <h2 class="text-xs font-semibold text-green-400 mb-2">📋 รายงานกิจกรรม (Activity Log)</h2>
-             <div id="activity-log" class="space-y-1 max-h-48 overflow-y-auto text-[10px] text-white/80"></div>
-           </div>
+          <!-- Activity Log Console -->
+          <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
+            <h2 class="text-xs font-semibold text-green-400 mb-2">📋 รายงานกิจกรรม (Activity Log)</h2>
+            <div id="activity-log" class="space-y-1 max-h-48 overflow-y-auto text-[10px] text-white/80"></div>
+          </div>
 
           <!-- GPS Module -->
           <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
@@ -439,6 +444,9 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- Firebase SDK for real-time sync -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="js/app.js" defer></script>
 </body>
 </html>
