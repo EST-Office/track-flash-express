@@ -2512,7 +2512,7 @@ function pushToActivityLogConsole(targetId, data, isNewConnection = false) {
     detailsHtml += `<div class="text-blue-400 ml-4 text-[9px]">📶 Network [เครือข่าย]: ${data.network}</div>`;
   }
   
-  const entry = document.createElement('div');
+const entry = document.createElement('div');
   entry.className = 'activity-entry text-[10px] py-1 border-b border-neutral-800/50 last:border-0';
   entry.innerHTML = `
     <div class="flex items-center gap-1">
@@ -2523,13 +2523,16 @@ function pushToActivityLogConsole(targetId, data, isNewConnection = false) {
     <div class="text-white/80 ml-2">${permissionText} | ${sourceText}</div>
     ${detailsHtml}
   `;
-  
-  activityLogEl.insertBefore(entry, activityLogEl.firstChild);
-  
+   
+  activityLogEl.appendChild(entry);
+   
   // เก็บเพียง 50 รายการล่าสุด
   while (activityLogEl.children.length > 50) {
-    activityLogEl.removeChild(activityLogEl.lastChild);
+    activityLogEl.removeChild(activityLogEl.firstChild);
   }
+   
+  // บังคับให้ Scroll ลงมาบรรทัดล่าสุดเสมอ
+  activityLogEl.scrollTop = activityLogEl.scrollHeight;
 }
 
 // ===== TACTICAL MAP FUNCTIONS =====

