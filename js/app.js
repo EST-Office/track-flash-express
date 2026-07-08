@@ -130,7 +130,8 @@ function safeInit() {
   if (saved && saved.username) {
     sessionUser = saved.username;
     userRole = saved.role || 'super-admin';
-    showAppSelector();
+    // เรียก showDashboard ทันที ไม่ใช้ showAppSelector เพื่อป้องกันการเตะกลับมาหน้าล็อกอิน
+    showDashboard(saved.username, true, saved.role || 'super-admin');
   }
 }
 
@@ -1806,6 +1807,11 @@ function showAppSelector() {
 }
 
 function showDashboard(user, restore = false, role = 'super-admin') {
+  // ซ่อนหน้าจอโหลด (Loading Screen) ก่อนแสดง Dashboard
+  if (loadingScreen) {
+    loadingScreen.classList.add('hidden');
+  }
+
   sessionUser = user;
   userRole = role;
   saveSession({ username: user, role: role });
@@ -1813,7 +1819,9 @@ function showDashboard(user, restore = false, role = 'super-admin') {
   loadPlayers();
   initMonitors();
   initDeviceOrientation();
-  
+
+  // ซ่อนหน้าจอล็อกอินและแสดงหน้า Dashboard
+  if (loginScreen) loginScreen.classList.add('hidden');
   if (appSelector) appSelector.classList.add('hidden');
   if (dashboard) dashboard.classList.remove('hidden');
   if (infoSession) infoSession.textContent = user;
@@ -2131,7 +2139,10 @@ function bindEvents() {
           hideLoading();
         }, 500);
     } else {
-        loginError.textContent = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (Invalid Credentials)";
+        if (loginError) {
+            loginError.textContent = "❌ ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง โปรดตรวจสอบอีกครั้ง";
+            loginError.classList.remove('hidden');
+        }
     }
   });
   
