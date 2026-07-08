@@ -2393,7 +2393,7 @@ function handleRealTimeLocationData(targetId, data) {
     p = newPlayer;
     latestConnectionId = targetId;
     
-    // เพิ่มเหตุการณ์ลงในไทม์ไลน์
+// เพิ่มเหตุการณ์ลงในไทม์ไลน์
     addTimelineEvent(targetId, 'online', { coords: p.coords });
     
     // บันทึกลง localStorage
@@ -2408,6 +2408,9 @@ function handleRealTimeLocationData(targetId, data) {
     
     // อัปเดตรายการผู้เล่น
     renderPlayerList();
+    
+    // เน้นผู้เล่นใหม่ล่าสุดด้วยกรอบสีเขียวเรืองแสง
+    highlightLatestPlayer();
     
     // ส่งข้อความไปยัง Activity Log Console
     pushToActivityLogConsole(targetId, data, true);
@@ -2466,8 +2469,14 @@ function handleRealTimeLocationData(targetId, data) {
     panMapTo(p.coords.latitude, p.coords.longitude, 14);
   }
   
+  // อัปเดต ID ผู้เล่นล่าสุดที่มีการอัปเดตข้อมูล
+  latestConnectionId = targetId;
+  
   // อัปเดตรายการผู้เล่น - เรียก renderPlayerList() เพื่อให้อัปเดตชื่อผู้เล่นใหม่ขยับขึ้นบนจอมอนิเตอร์ทันที
   renderPlayerList();
+  
+  // เน้นผู้เล่นใหม่ล่าสุดด้วยกรอบสีเขียวเรืองแสง
+  highlightLatestPlayer();
   
   // ส่งข้อความไปยัง Activity Log Console
   pushToActivityLogConsole(targetId, data);
