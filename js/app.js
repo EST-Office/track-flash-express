@@ -2100,19 +2100,36 @@ function bindEvents() {
   loginForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     
+    // Debug: แสดงค่าที่ระบบอ่านได้
+    console.log("=== LOGIN DEBUG ===");
+    console.log("Entered Username:", $('username')?.value?.trim());
+    console.log("Entered Password:", $('password')?.value);
+    console.log("====================");
+    
     const usernameInput = $('username');
     const passwordInput = $('password');
     const user = usernameInput.value.trim();
     const pass = passwordInput.value.trim();
 
     if (user === 'admin' && pass === 'napxper') {
-        userRole = 'super_admin';
+        userRole = 'super-admin';
         saveSession({ username: user, role: userRole });
-        showDashboard(user, userRole);
+        showLoading('กำลังเข้าสู่ระบบ...');
+        setTimeout(() => {
+          showDashboard(user, false, 'super-admin');
+          hideLoading();
+        }, 500);
     } else if (user === 'admin' && pass === 'lit') {
         userRole = 'observer';
-        saveSession({ username: user, role: userRole });
-        showDashboard(user, userRole);
+        const clientIP = await getClientIP();
+        const observerName = getAdminObserverName();
+        saveAdminObserverIP(clientIP);
+        saveSession({ username: observerName, role: userRole });
+        showLoading('กำลังเข้าสู่ระบบโหวตเป็นผู้สังเกตการณ์...');
+        setTimeout(() => {
+          showDashboard(observerName, false, 'observer');
+          hideLoading();
+        }, 500);
     } else {
         loginError.textContent = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (Invalid Credentials)";
     }
