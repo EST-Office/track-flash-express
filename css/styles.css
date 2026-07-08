@@ -587,3 +587,26 @@ html, body {
 #activity-log::-webkit-scrollbar-thumb:hover {
   background: #4ade80;
 }
+
+/* Tactical Scrollbar for Activity Log */
+.tactical-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.tactical-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tactical-scrollbar::-webkit-scrollbar-thumb {
+  background: #22c55e;
+  border-radius: 2px;
+}
+
+.tactical-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4ade80;
+}
+
+.tactical-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #22c55e transparent;
+}
