@@ -130,6 +130,7 @@
 
   <!-- ========== TACTICAL DASHBOARD (3-Column Layout) ========== -->
   <div id="dashboard" class="hidden h-full flex flex-col dashboard-container">
+    <!-- Top Navigation Bar with Quick Actions -->
     <header class="shrink-0 flex items-center justify-between px-3 py-2 sm:px-5 sm:py-1.5 border-b border-neutral-800 bg-neutral-900/95 backdrop-blur-sm z-40">
       <div class="flex items-center gap-2 sm:gap-3 min-w-0">
         <div class="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg border border-green-500/30 bg-green-500/10">
@@ -143,6 +144,31 @@
           <p class="truncate text-[10px] text-orange-400 sm:text-xs">Integrated Tactical Dashboard</p>
         </div>
       </div>
+      
+      <!-- Top Bar Quick Actions (GPS Scan, Status Battery, Network, Clear) -->
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <button id="top-gps-btn" title="GPS Scan"
+          class="tactical-top-btn rounded-lg border border-green-500/30 bg-green-500/10 px-2 py-1 text-[10px] sm:text-xs font-medium text-green-400 hover:bg-green-500/20 transition">
+          📍 GPS Scan
+        </button>
+        <button id="top-battery-btn" title="Status Battery"
+          class="tactical-top-btn rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-2 py-1 text-[10px] sm:text-xs font-medium text-yellow-400 hover:bg-yellow-500/20 transition">
+          🔋 Battery
+        </button>
+        <button id="top-network-btn" title="Network"
+          class="tactical-top-btn rounded-lg border border-blue-500/30 bg-blue-500/10 px-2 py-1 text-[10px] sm:text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition">
+          📶 Network
+        </button>
+        <button id="top-clear-btn" title="Clear Map"
+          class="tactical-top-btn rounded-lg border border-purple-500/30 bg-purple-500/10 px-2 py-1 text-[10px] sm:text-xs font-medium text-purple-400 hover:bg-purple-500/20 transition">
+          🗑️ Clear
+        </button>
+        <button id="top-back-btn" title="Back to Main Menu"
+          class="tactical-top-btn rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] sm:text-xs font-medium text-red-400 hover:bg-red-500/20 transition">
+          ↩ กลับสู่เมนูหน้าแรก
+        </button>
+      </div>
+      
       <div class="flex items-center gap-2 sm:gap-3 shrink-0">
         <span id="header-mode" class="hidden text-[10px] text-orange-400 sm:inline font-mono">MODE: ACTIVE</span>
         <span id="header-status" class="text-[10px] sm:text-xs text-white">Ready</span>
@@ -165,121 +191,96 @@
        <aside id="left-sidebar" class="w-full lg:w-64 xl:w-72 shrink-0 border-b lg:border-b-0 lg:border-r border-neutral-800 bg-neutral-900 overflow-y-auto max-h-[40vh] lg:max-h-none sidebar-drawer">
          <div class="p-3 sm:p-4 space-y-3">
          
-           <!-- Activity Log Console -->
-           <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3 flex flex-col">
-             <h2 class="text-xs font-semibold text-green-400 mb-2 flex-shrink-0">📋 รายงานกิจกรรม (Activity Log)</h2>
-             <div id="activity-log" class="space-y-1 flex-1 overflow-y-auto text-[10px] text-white/80 tactical-scrollbar"></div>
-           </div>
+          <!-- Activity Log Console -->
+          <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3 flex flex-col">
+            <h2 class="text-xs font-semibold text-green-400 mb-2 flex-shrink-0">📋 รายงานกิจกรรม (Activity Log)</h2>
+            <div id="activity-log" class="space-y-1 flex-1 overflow-y-auto text-[10px] text-white/80 tactical-scrollbar"></div>
+          </div>
 ```
 
-          <!-- GPS Module -->
-          <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
-            <h2 class="text-xs font-semibold text-green-400 mb-0.5">Control Panel Matrix</h2>
-            <p class="text-[10px] text-orange-400 mb-3">Admin GPS — ระบุพิกัดเครื่องปัจจุบัน</p>
-            <button id="gps-icon-btn" title="Activate Admin GPS"
-              class="group flex w-full flex-col items-center gap-1.5 rounded-xl border border-neutral-700 bg-neutral-800/50 p-4 transition hover:border-green-500/40 hover:bg-green-500/5 active:scale-[0.97]">
-              <div class="flex h-12 w-12 items-center justify-center rounded-full border-2 border-green-500/40 bg-green-500/10 group-hover:border-green-400">
-                <svg class="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                </svg>
-              </div>
-              <span class="text-xs font-medium text-white">Admin GPS Scan</span>
-              <span class="text-[10px] text-orange-400">Hybrid Geolocation</span>
-            </button>
-          </div>
+           <!-- GPS Module -->
+           <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
+             <h2 class="text-xs font-semibold text-green-400 mb-0.5">Control Panel Matrix</h2>
+             <p class="text-[10px] text-orange-400 mb-3">Admin GPS — ระบุพิกัดเครื่องปัจจุบัน</p>
+             <button id="gps-icon-btn" title="Activate Admin GPS"
+               class="group flex w-full flex-col items-center gap-1.5 rounded-xl border border-neutral-700 bg-neutral-800/50 p-4 transition hover:border-green-500/40 hover:bg-green-500/5 active:scale-[0.97]">
+               <div class="flex h-12 w-12 items-center justify-center rounded-full border-2 border-green-500/40 bg-green-500/10 group-hover:border-green-400">
+                 <svg class="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                   <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                 </svg>
+               </div>
+               <span class="text-xs font-medium text-white">Admin GPS Scan</span>
+               <span class="text-[10px] text-orange-400">Hybrid Geolocation</span>
+             </button>
+           </div>
 
-          <!-- Quick Action Buttons -->
-          <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
-            <h2 class="text-xs font-semibold text-green-400 mb-2">Quick Actions</h2>
-            <div class="grid grid-cols-2 gap-2">
-              <button id="quick-gps-btn" class="quick-action-btn rounded-lg border border-green-500/30 bg-green-500/10 py-2 text-xs font-medium text-green-400 hover:bg-green-500/20 transition">
-                📍 GPS Scan
-              </button>
-              <button id="quick-status-btn" class="quick-action-btn rounded-lg border border-orange-500/30 bg-orange-500/10 py-2 text-xs font-medium text-orange-400 hover:bg-orange-500/20 transition">
-                📊 Status
-              </button>
-              <button id="quick-battery-btn" class="quick-action-btn rounded-lg border border-yellow-500/30 bg-yellow-500/10 py-2 text-xs font-medium text-yellow-400 hover:bg-yellow-500/20 transition">
-                🔋 Battery
-              </button>
-              <button id="quick-network-btn" class="quick-action-btn rounded-lg border border-blue-500/30 bg-blue-500/10 py-2 text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition">
-                📶 Network
-              </button>
-              <button id="quick-clear-btn" class="quick-action-btn rounded-lg border border-purple-500/30 bg-purple-500/10 py-2 text-xs font-medium text-purple-400 hover:bg-purple-500/20 transition">
-                🗑️ Clear
-              </button>
-              <button id="back-to-menu-btn" class="quick-action-btn rounded-lg border border-red-500/30 bg-red-500/10 py-2 text-xs font-medium text-red-400 hover:bg-red-500/20 transition">
-                ↩ กลับสู่เมนูหน้าแรก
-              </button>
-            </div>
-          </div>
+           <!-- System Info -->
+           <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
+             <h2 class="text-xs font-semibold text-green-400 mb-2">System Info</h2>
+             <dl class="space-y-1.5 text-[10px] sm:text-xs">
+               <div class="flex justify-between gap-2">
+                 <dt class="text-orange-400">Session</dt>
+                 <dd id="info-session" class="text-white truncate">—</dd>
+               </div>
+               <div class="flex justify-between gap-2">
+                 <dt class="text-orange-400">Active Target</dt>
+                 <dd id="info-active-target" class="text-white truncate">Admin</dd>
+               </div>
+               <div class="flex justify-between gap-2">
+                 <dt class="text-orange-400">GPS Status</dt>
+                 <dd id="info-gps" class="text-white">Idle</dd>
+               </div>
+               <div class="flex justify-between gap-2">
+                 <dt class="text-orange-400">Last Action</dt>
+                 <dd id="info-last-action" class="text-white truncate">—</dd>
+               </div>
+             </dl>
+           </div>
+         </div>
+       </aside>
 
-          <!-- System Info -->
-          <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
-            <h2 class="text-xs font-semibold text-green-400 mb-2">System Info</h2>
-            <dl class="space-y-1.5 text-[10px] sm:text-xs">
-              <div class="flex justify-between gap-2">
-                <dt class="text-orange-400">Session</dt>
-                <dd id="info-session" class="text-white truncate">—</dd>
-              </div>
-              <div class="flex justify-between gap-2">
-                <dt class="text-orange-400">Active Target</dt>
-                <dd id="info-active-target" class="text-white truncate">Admin</dd>
-              </div>
-              <div class="flex justify-between gap-2">
-                <dt class="text-orange-400">GPS Status</dt>
-                <dd id="info-gps" class="text-white">Idle</dd>
-              </div>
-              <div class="flex justify-between gap-2">
-                <dt class="text-orange-400">Last Action</dt>
-                <dd id="info-last-action" class="text-white truncate">—</dd>
-              </div>
-            </dl>
-          </div>
-        </div>
-      </aside>
-
-      <!-- CENTER COLUMN: Map + Command Input -->
-      <div class="flex-1 flex flex-col min-h-0 min-w-0">
+       <!-- CENTER COLUMN: Map + Command Input -->
+       <div class="flex-1 flex flex-col min-h-0 min-w-0">
         
-        <!-- Map Header -->
-        <div class="shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-neutral-800 bg-neutral-900/80">
-          <span class="text-[10px] sm:text-xs font-mono text-orange-400">Tactical Map Monitor — Chumphon HQ</span>
-          <span id="map-coords-display" class="text-[10px] font-mono text-white/60">—</span>
-        </div>
-        
-        <!-- Map Container -->
-        <div id="tactical-map" class="flex-1 min-h-[200px] bg-neutral-900 z-0"></div>
+         <!-- Map Header -->
+         <div class="shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-neutral-800 bg-neutral-900/80">
+           <span class="text-[10px] sm:text-xs font-mono text-orange-400">Tactical Map Monitor — Chumphon HQ</span>
+           <span id="map-coords-display" class="text-[10px] font-mono text-white/60">—</span>
+         </div>
+         
+         <!-- Map Container -->
+         <div id="tactical-map" class="flex-1 min-h-[200px] bg-neutral-900 z-0"></div>
 
-        <!-- Console Output (Hidden but needed for JS) -->
-        <div id="console-output" class="hidden"></div>
-        <span id="console-clock" class="hidden"></span>
-        
-        <!-- Command Input (Moved below map) -->
-        <div class="shrink-0 border-t border-neutral-800 p-2 sm:p-3 bg-neutral-900">
-          <form id="command-form" class="flex items-center gap-2">
-            <span class="hidden sm:inline shrink-0 font-mono text-sm text-green-400">></span>
-            <input type="text" id="command-input" autocomplete="off" spellcheck="false"
-              class="flex-1 min-w-0 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 font-mono text-xs sm:text-sm text-white placeholder-white/30 outline-none focus:border-green-500/40 focus:ring-1 focus:ring-green-500/20"
-              placeholder="พิมพ์คำสั่งที่นี่ (เช่น /help, /gps, /status, /battery, /network, /clear, /logout)..." />
-            <button type="submit" class="shrink-0 rounded-lg bg-neutral-700 px-3 py-2 font-mono text-[10px] sm:text-xs text-white hover:bg-green-600 transition">RUN</button>
-          </form>
-        </div>
-      </div>
+         <!-- Console Output (Hidden but needed for JS) -->
+         <div id="console-output" class="hidden"></div>
+         <span id="console-clock" class="hidden"></span>
+         
+         <!-- Command Input (Moved below map) -->
+         <div class="shrink-0 border-t border-neutral-800 p-2 sm:p-3 bg-neutral-900">
+           <form id="command-form" class="flex items-center gap-2">
+             <span class="hidden sm:inline shrink-0 font-mono text-sm text-green-400">></span>
+             <input type="text" id="command-input" autocomplete="off" spellcheck="false"
+               class="flex-1 min-w-0 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 font-mono text-xs sm:text-sm text-white placeholder-white/30 outline-none focus:border-green-500/40 focus:ring-1 focus:ring-green-500/20"
+               placeholder="พิมพ์คำสั่งที่นี่ (เช่น /help, /gps, /status, /battery, /network, /clear, /logout)..." />
+             <button type="submit" class="shrink-0 rounded-lg bg-neutral-700 px-3 py-2 font-mono text-[10px] sm:text-xs text-white hover:bg-green-600 transition">RUN</button>
+           </form>
+         </div>
+       </div>
 
-      <!-- RIGHT SIDEBAR: Compact Player List with Accordion -->
-      <aside id="right-sidebar" class="w-full lg:w-64 xl:w-72 shrink-0 border-t lg:border-t-0 lg:border-l border-neutral-800 bg-neutral-900 overflow-y-auto max-h-[40vh] lg:max-h-none sidebar-drawer">
-        <div class="p-3 sm:p-4">
-          <div class="flex items-center justify-between mb-3">
-            <h2 class="text-xs font-semibold text-green-400">Player Targets</h2>
-            <button id="add-player-btn" title="Add Target"
-              class="h-6 w-6 rounded border border-neutral-700 text-green-400 text-sm hover:border-green-500/50 transition">+</button>
-          </div>
-          <div id="player-list" class="space-y-2"></div>
-        </div>
-      </aside>
-    </div>
-  </div>
+       <!-- RIGHT SIDEBAR: Compact Player List with Accordion -->
+       <aside id="right-sidebar" class="w-full lg:w-64 xl:w-72 shrink-0 border-t lg:border-t-0 lg:border-l border-neutral-800 bg-neutral-900 overflow-y-auto max-h-[40vh] lg:max-h-none sidebar-drawer">
+         <div class="p-3 sm:p-4">
+           <div class="flex items-center justify-between mb-3">
+             <h2 class="text-xs font-semibold text-green-400">Player Targets</h2>
+             <button id="add-player-btn" title="Add Target"
+               class="h-6 w-6 rounded border border-neutral-700 text-green-400 text-sm hover:border-green-500/50 transition">+</button>
+           </div>
+           <div id="player-list" class="space-y-2"></div>
+         </div>
+       </aside>
+     </div>
+   </div>
 
   <!-- ========== LEFT SLIDING DRAWER (Mobile) ========== -->
   <div id="left-drawer" class="hidden fixed inset-y-0 left-0 z-50 w-full max-w-md transform transition-transform duration-300 ease-in-out">
@@ -311,31 +312,6 @@
             <span class="text-xs font-medium text-white">Admin GPS Scan</span>
             <span class="text-[10px] text-orange-400">Hybrid Geolocation</span>
           </button>
-        </div>
-
-        <!-- Quick Action Buttons -->
-        <div class="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">
-          <h2 class="text-xs font-semibold text-green-400 mb-2">Quick Actions</h2>
-          <div class="grid grid-cols-2 gap-2">
-            <button id="drawer-quick-gps-btn" class="quick-action-btn rounded-lg border border-green-500/30 bg-green-500/10 py-2 text-xs font-medium text-green-400 hover:bg-green-500/20 transition">
-              📍 GPS Scan
-            </button>
-            <button id="drawer-quick-status-btn" class="quick-action-btn rounded-lg border border-orange-500/30 bg-orange-500/10 py-2 text-xs font-medium text-orange-400 hover:bg-orange-500/20 transition">
-              📊 Status
-            </button>
-            <button id="drawer-quick-battery-btn" class="quick-action-btn rounded-lg border border-yellow-500/30 bg-yellow-500/10 py-2 text-xs font-medium text-yellow-400 hover:bg-yellow-500/20 transition">
-              🔋 Battery
-            </button>
-            <button id="drawer-quick-network-btn" class="quick-action-btn rounded-lg border border-blue-500/30 bg-blue-500/10 py-2 text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition">
-              📶 Network
-            </button>
-            <button id="drawer-quick-clear-btn" class="quick-action-btn rounded-lg border border-purple-500/30 bg-purple-500/10 py-2 text-xs font-medium text-purple-400 hover:bg-purple-500/20 transition">
-              🗑️ Clear
-            </button>
-            <button id="drawer-back-to-menu-btn" class="quick-action-btn rounded-lg border border-red-500/30 bg-red-500/10 py-2 text-xs font-medium text-red-400 hover:bg-red-500/20 transition">
-              ↩ กลับสู่เมนูหน้าแรก
-            </button>
-          </div>
         </div>
 
         <!-- System Info -->

